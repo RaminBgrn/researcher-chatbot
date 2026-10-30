@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>دستیار پژوهشگر</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <main class="app">
+    <header class="header">
+      <div class="title">
+        <div class="avatar">🔎</div>
+        <div>
+          <h1>دستیار پژوهشگر</h1>
+          <p class="subtitle"><span class="dot"></span> یک موضوع بگو، درباره‌اش تحقیق می‌کنم و گزارش را فایل می‌کنم</p>
+        </div>
+      </div>
+      <button id="clearBtn" class="ghost-btn" title="پاک کردن تاریخچه گفتگو">🗑️ پاک کردن هیستوری</button>
+    </header>
+
+    <section id="messages" class="messages">
+      <div class="msg bot">
+        <div class="bubble">سلام رامین 👋<br>یه موضوع بهم بده تا درباره‌اش تحقیق کنم؛ مثلاً: «هوش مصنوعی» یا «Quantum Computing»</div>
+      </div>
+    </section>
+
+    <form id="chatForm" class="composer">
+      <input id="input" type="text" placeholder="موضوع تحقیق را بنویس..." autocomplete="off" />
+      <button type="submit" id="sendBtn">ارسال ➤</button>
+    </form>
+
+    <footer class="footer">گزارش هر تحقیق به صورت فایل در پوشه <code>outputs/</code> ذخیره می‌شود.</footer>
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
