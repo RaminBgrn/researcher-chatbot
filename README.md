@@ -29,6 +29,10 @@ python app.py
 
 بعد در مرورگر: http://localhost:5000
 
+## گیت‌هاب
+
+https://github.com/RaminBgrn/researcher-chatbot (public — ساخته‌شده در ۲۰۲۶-۱۰-۳۰)
+
 ## وضعیت
 
 - [x] اسکلت پروژه + فرانت + بک‌اند
