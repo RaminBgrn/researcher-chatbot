@@ -4,9 +4,10 @@ tools.py — ابزارهایی که مدل می‌تواند صدا بزند (T
 هر ابزار = یک تابع ساده پایتون + یک توضیح (schema) برای مدل.
 مدل خودش تصمیم می‌گیرد کی و با چه ورودی‌ای ابزار را صدا بزند.
 
-دو ابزار داریم:
-1. search_wikipedia : تحقیق درباره یک موضوع (بدون نیاز به API key)
-2. save_research    : ذخیره گزارش نهایی در یک فایل داخل پوشه outputs/
+سه ابزار داریم:
+1. search_wikipedia : تحقیق دانشنامه‌ای درباره یک موضوع (بدون نیاز به API key)
+2. search_web       : جستجو در کل وب با Tavily (برای اطلاعات تازه؛ نیازمند TAVILY_API_KEY)
+3. save_research    : ذخیره گزارش نهایی در یک فایل داخل پوشه outputs/
 """
 
 import os
@@ -53,6 +54,51 @@ def search_wikipedia(topic: str) -> dict:
 
 
 # ---------------------------------------------------------------- ابزار ۲
+def search_web(query: str, max_results: int = 5) -> dict:
+    """در وب جستجو می‌کند (Tavily) و چند نتیجه با عنوان، لینک و متن برمی‌گرداند.
+
+    برای اطلاعات تازه و روز مناسب است (اخبار، قیمت، آب‌وهوا، رویدادهای اخیر)
+    و هر موضوعی که در ویکی‌پدیا نیست. کلید از متغیر TAVILY_API_KEY در .env خوانده می‌شود.
+    """
+    api_key = os.getenv("TAVILY_API_KEY", "").strip()
+    if not api_key:
+        return {"error": "کلید Tavily تنظیم نشده است (TAVILY_API_KEY در فایل .env خالی است)."}
+
+    try:
+        count = max(1, min(int(max_results), 10))
+    except (TypeError, ValueError):
+        count = 5
+
+    try:
+        response = requests.post(
+            "https://api.tavily.com/search",
+            json={"query": query, "max_results": count, "search_depth": "basic"},
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            },
+            timeout=15,
+        )
+        response.raise_for_status()
+        data = response.json()
+    except Exception as exc:  # شبکه، کلید نامعتبر، یا هر خطای دیگر
+        return {"error": f"جستجوی وب ناموفق بود: {exc}"}
+
+    results = []
+    for item in data.get("results", [])[:count]:
+        results.append({
+            "title": item.get("title", ""),
+            "url": item.get("url", ""),
+            "content": (item.get("content") or "")[:800],  # هر نتیجه را کوتاه نگه می‌داریم
+        })
+
+    if not results:
+        return {"error": f"برای «{query}» در وب نتیجه‌ای پیدا نشد."}
+
+    return {"query": query, "results": results}
+
+
+# ---------------------------------------------------------------- ابزار ۳
 def save_research(title: str, content: str) -> dict:
     """گزارش را در یک فایل متنی داخل پوشه outputs/ ذخیره می‌کند."""
     os.makedirs(OUTPUT_DIR, exist_ok=True)
@@ -92,6 +138,27 @@ TOOLS = [
     {
         "type": "function",
         "function": {
+            "name": "search_web",
+            "description": "در کل وب جستجو می‌کند و چند نتیجه با عنوان، لینک و متن برمی‌گرداند. برای اطلاعات تازه و روز (اخبار، قیمت، آب‌وهوا، رویدادهای اخیر) یا موضوع‌هایی که در ویکی‌پدیا نیستند از این ابزار استفاده کن.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "عبارتی که باید در وب جستجو شود، مثلا: Tehran weather today",
+                    },
+                    "max_results": {
+                        "type": "integer",
+                        "description": "تعداد نتایج (اختیاری، پیش‌فرض ۵، حداکثر ۱۰)",
+                    },
+                },
+                "required": ["query"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "save_research",
             "description": "گزارش نهایی تحقیق را در یک فایل ذخیره می‌کند.",
             "parameters": {
@@ -109,5 +176,6 @@ TOOLS = [
 # اسم ابزار -> خود تابع؛ برای اجرا کردن tool call ای که مدل خواسته است
 TOOL_FUNCTIONS = {
     "search_wikipedia": search_wikipedia,
+    "search_web": search_web,
     "save_research": save_research,
 }
