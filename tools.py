@@ -19,6 +19,36 @@ import requests
 # پوشه‌ای که گزارش‌ها داخلش ذخیره می‌شوند
 OUTPUT_DIR = os.path.join(os.path.dirname(__file__), "outputs")
 
+OPEN_WEATHER_KEY = os.getenv("OPEN_WEATHER_KEY", "")
+
+def get_weather(city_name: str) -> dict:
+
+    if not OPEN_WEATHER_KEY:
+        return {"error": "کلید OpenWeather تنظیم نشده است (OPEN_WEATHER_KEY در .env خالی است)."}
+
+    url = "https://api.openweathermap.org/data/2.5/weather"
+    params = {
+        "q": city_name,           
+        "appid": OPEN_WEATHER_KEY,
+        "units": "metric",        
+        "lang": "fa",            
+    }
+    try:
+        response = requests.get(url, params=params, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+    except Exception as exc:
+        return {"error": f"دریافت آب‌وهوا ناموفق بود: {exc}"}
+
+    # فقط فیلدهایی که مدل برای جواب لازم دارد
+    return {
+        "city": data.get("name", city_name),
+        "temperature": data["main"]["temp"],
+        "feels_like": data["main"]["feels_like"],
+        "humidity": data["main"]["humidity"],
+        "description": data["weather"][0]["description"],
+        "wind_speed": data["wind"]["speed"],
+    }
 
 # ---------------------------------------------------------------- ابزار ۱
 def search_wikipedia(topic: str) -> dict:
@@ -119,6 +149,23 @@ def save_research(title: str, content: str) -> dict:
 # این لیست همان چیزی است که به API داده می‌شود تا مدل ابزارها را بشناسد.
 TOOLS = [
     {
+        "type": "function", 
+        "function" : {
+            "name" : "get_weather", 
+            "description" : "آب‌وهوای فعلی یک شهر را برمی‌گرداند. وقتی کاربر درباره آب‌وهوای امروز یک شهر می‌پرسد از این ابزار استفاده کن.",
+            "parameters" : {
+                "type" : 'object',
+                "properties" : {
+                    "city_name" : {
+                        "type" : "string", 
+                        "description" : "نام شهر به انگلیسی، مثلا: Tehran",
+                    }
+                },
+                "required" : ["city_name"]
+            },
+        }
+    },
+    {
         "type": "function",
         "function": {
             "name": "search_wikipedia",
@@ -175,6 +222,7 @@ TOOLS = [
 
 # اسم ابزار -> خود تابع؛ برای اجرا کردن tool call ای که مدل خواسته است
 TOOL_FUNCTIONS = {
+    "get_weather" : get_weather,
     "search_wikipedia": search_wikipedia,
     "search_web": search_web,
     "save_research": save_research,
