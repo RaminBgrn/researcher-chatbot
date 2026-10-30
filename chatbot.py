@@ -41,13 +41,30 @@ class ResearcherChatbot:
         """هیستوری را پاک می‌کند؛ فقط سیستم پرامپت می‌ماند."""
         self.history = [{"role": "system", "content": SYSTEM_PROMPT}]
 
+    def visible_messages(self):
+        """فقط پیام‌هایی که کاربر باید ببیند: پیام‌های او و جواب‌های نهایی بات.
+
+        پیام سیستم و رفت‌وبرگشت ابزارها جزو هیستوری داخلی‌اند، نه نمایش.
+        """
+        visible = []
+        for message in self.history:
+            role = message.get("role")
+            content = message.get("content")
+            if role in ("user", "assistant") and content:
+                visible.append({"role": role, "content": content})
+        return visible
+
     # -------------------------------------------------------------- چت
     def chat(self, user_message: str) -> str:
         if self.client is None:
-            return (
+            # پیام و جواب خطا هم در هیستوری می‌مانند تا گفتگو در UI گم نشود
+            warning = (
                 "⚠️ هنوز API key تنظیم نشده است. "
                 "فایل .env را با API_KEY و BASE_URL و MODEL_NAME کامل کن و دوباره تلاش کن."
             )
+            self.history.append({"role": "user", "content": user_message})
+            self.history.append({"role": "assistant", "content": warning})
+            return warning
 
         # ۱) پیام کاربر به هیستوری اضافه می‌شود
         self.history.append({"role": "user", "content": user_message})

@@ -4,34 +4,62 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>دستیار پژوهشگر</title>
+  <script>
+    // تم ذخیره‌شده را قبل از رندر اعمال می‌کنیم تا صفحه چشمک نزند
+    try {
+      var t = localStorage.getItem("theme");
+      if (t === "dark" || t === "light") document.documentElement.setAttribute("data-theme", t);
+    } catch (e) {}
+  </script>
   <link rel="stylesheet" href="/static/style.css" />
 </head>
 <body>
-  <main class="app">
-    <header class="header">
-      <div class="title">
+  <div class="layout">
+
+    <!-- ---------- سایدبار گفتگوها ---------- -->
+    <aside id="sidebar" class="sidebar" aria-label="فهرست گفتگوها">
+      <div class="side-head">
         <div class="avatar">🔎</div>
         <div>
-          <h1>دستیار پژوهشگر</h1>
-          <p class="subtitle"><span class="dot"></span> یک موضوع بگو، درباره‌اش تحقیق می‌کنم و گزارش را فایل می‌کنم</p>
+          <strong>پژوهشگر</strong>
+          <p class="side-sub">گفتگوهای شما</p>
         </div>
       </div>
-      <button id="clearBtn" class="ghost-btn" title="پاک کردن تاریخچه گفتگو">🗑️ پاک کردن هیستوری</button>
-    </header>
 
-    <section id="messages" class="messages">
-      <div class="msg bot">
-        <div class="bubble">سلام رامین 👋<br>یه موضوع بهم بده تا درباره‌اش تحقیق کنم؛ مثلاً: «هوش مصنوعی» یا «Quantum Computing»</div>
-      </div>
-    </section>
+      <button id="newChatBtn" class="new-chat-btn">＋ چت جدید</button>
 
-    <form id="chatForm" class="composer">
-      <input id="input" type="text" placeholder="موضوع تحقیق را بنویس..." autocomplete="off" />
-      <button type="submit" id="sendBtn">ارسال ➤</button>
-    </form>
+      <nav id="chatList" class="chat-list"></nav>
 
-    <footer class="footer">گزارش هر تحقیق به صورت فایل در پوشه <code>outputs/</code> ذخیره می‌شود.</footer>
-  </main>
+      <p class="side-foot">گزارش هر تحقیق در پوشه <code>outputs/</code> ذخیره می‌شود.</p>
+    </aside>
+    <div id="overlay" class="overlay"></div>
+
+    <!-- ---------- بخش اصلی چت ---------- -->
+    <main class="app">
+      <header class="header">
+        <button id="menuBtn" class="icon-btn menu-btn" aria-label="باز کردن فهرست گفتگوها">☰</button>
+        <div class="title">
+          <h1>دستیار پژوهشگر</h1>
+          <p class="subtitle"><span class="dot"></span> یک موضوع بگو، درباره‌اش تحقیق می‌کنم</p>
+        </div>
+        <div class="header-actions">
+          <div class="theme-toggle" role="radiogroup" aria-label="انتخاب تم">
+            <button class="theme-option" data-theme-value="light" role="radio" aria-checked="false" title="روشن">☀️</button>
+            <button class="theme-option" data-theme-value="dark" role="radio" aria-checked="false" title="تیره">🌙</button>
+            <button class="theme-option" data-theme-value="system" role="radio" aria-checked="true" title="سیستم">💻</button>
+          </div>
+          <button id="clearBtn" class="ghost-btn" title="پاک کردن این گفتگو">🗑️ پاک کردن</button>
+        </div>
+      </header>
+
+      <section id="messages" class="messages" aria-live="polite"></section>
+
+      <form id="chatForm" class="composer">
+        <input id="input" type="text" placeholder="موضوع تحقیق را بنویس..." autocomplete="off" aria-label="موضوع تحقیق" />
+        <button type="submit" id="sendBtn">ارسال ➤</button>
+      </form>
+    </main>
+  </div>
 
   <script src="/static/app.js"></script>
 </body>
