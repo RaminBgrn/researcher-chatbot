@@ -12,6 +12,7 @@ chatbot.py — مغز چت‌بات: مدیریت هیستوری + حلقه Tool
 
 import json
 import os
+from datetime import datetime
 
 from dotenv import load_dotenv
 from openai import OpenAI
@@ -40,6 +41,8 @@ class ResearcherChatbot:
     def clear_history(self):
         """هیستوری را پاک می‌کند؛ فقط سیستم پرامپت می‌ماند."""
         self.history = [{"role": "system", "content": SYSTEM_PROMPT}]
+        # لاگ خام رفت‌وبرگشت با مدل، برای پنل دیباگ UI (نمایش JSON درخواست و پاسخ)
+        self.api_log = []
 
     def visible_messages(self):
         """فقط پیام‌هایی که کاربر باید ببیند: پیام‌های او و جواب‌های نهایی بات.
@@ -71,11 +74,31 @@ class ResearcherChatbot:
 
         # ۲) حلقه اصلی: پرسیدن از مدل + اجرای ابزارها تا جواب نهایی
         for _ in range(MAX_TOOL_ROUNDS):
+            # اسنپ‌شات درخواست، برای پنل دیباگ: دقیقاً همان چیزی که برای مدل می‌رود
+            request_payload = {
+                "model": MODEL_NAME,
+                "messages": json.loads(json.dumps(self.history, ensure_ascii=False)),
+                "tools": TOOLS,
+                "tool_choice": "auto",
+            }
             response = self.client.chat.completions.create(
                 model=MODEL_NAME,
                 messages=self.history,
                 tools=TOOLS,
                 tool_choice="auto",
+            )
+            # پاسخ خام مدل را هم کنار درخواستش نگه می‌داریم
+            try:
+                response_payload = response.model_dump()
+            except Exception:
+                response_payload = {"raw": str(response)}
+            self.api_log.append(
+                {
+                    "round": len(self.api_log) + 1,
+                    "time": datetime.now().strftime("%H:%M:%S"),
+                    "request": request_payload,
+                    "response": response_payload,
+                }
             )
             message = response.choices[0].message
             print(response.choices)

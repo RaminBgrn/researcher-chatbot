@@ -283,3 +283,38 @@ h1 { font-size: 19px; }
   .overlay.show { opacity: 1; pointer-events: auto; }
   .ghost-btn { padding: 8px 9px; }
 }
+
+/* ---------------- پنل دیباگ: لاگ JSON ---------------- */
+.debug-panel { margin-top: 10px; border-top: 1px solid var(--border); padding-top: 10px; }
+.debug-toggle {
+  width: 100%; min-height: 40px; padding: 8px 10px;
+  background: var(--surface); color: var(--text);
+  border: 1px solid var(--border); border-radius: 10px;
+  font: inherit; font-size: 12.5px; cursor: pointer; text-align: center;
+}
+.debug-toggle:hover { background: var(--surface-strong); }
+.debug-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.debug-body { margin-top: 8px; }
+.debug-log { max-height: 46vh; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+.debug-empty { color: var(--muted); font-size: 12px; text-align: center; margin: 6px 0; }
+.debug-entry { border: 1px solid var(--border); border-radius: 10px; padding: 8px; background: var(--surface); }
+.debug-round { margin: 0 0 6px; font-size: 12px; color: var(--accent-2); font-weight: 700; }
+.debug-block { margin-top: 8px; }
+.debug-block-head {
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 11.5px; color: var(--muted); margin-bottom: 4px;
+}
+.debug-copy {
+  background: transparent; color: var(--accent-2);
+  border: 1px solid var(--border); border-radius: 6px;
+  font: inherit; font-size: 11px; padding: 2px 8px; cursor: pointer; min-height: 24px;
+}
+.debug-copy:hover { background: var(--surface-strong); }
+.debug-pre {
+  direction: ltr; text-align: left; margin: 0;
+  font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 10.5px; line-height: 1.5;
+  background: rgba(0, 0, 0, 0.22); color: var(--text);
+  border: 1px solid var(--border); border-radius: 8px;
+  padding: 8px; max-height: 220px; overflow: auto; white-space: pre-wrap; word-break: break-word;
+}
+:root[data-theme="light"] .debug-pre { background: rgba(23, 26, 60, 0.05); }

@@ -104,6 +104,7 @@ async function openChat(id) {
     chat.messages.forEach((m) => addMessage(m.content, m.role === "user" ? "user" : "bot"));
   }
   await loadChats();
+  await loadDebugLog();
   closeSidebar();
   input.focus();
 }
@@ -158,9 +159,71 @@ form.addEventListener("submit", async (e) => {
   } finally {
     sendBtn.disabled = false;
     await loadChats(); // عنوان و تعداد پیام‌ها تازه شود
+    await loadDebugLog(); // لاگ JSON این گفتگو هم تازه شود
     input.focus();
   }
 });
+
+/* ================= پنل دیباگ: لاگ JSON درخواست/پاسخ ================= */
+const debugToggle = document.getElementById("debugToggle");
+const debugBody = document.getElementById("debugBody");
+const debugLogEl = document.getElementById("debugLog");
+
+debugToggle.addEventListener("click", async () => {
+  const willOpen = debugBody.hidden;
+  debugBody.hidden = !willOpen;
+  debugToggle.setAttribute("aria-expanded", willOpen ? "true" : "false");
+  if (willOpen) await loadDebugLog();
+});
+
+function debugBlock(label, payload) {
+  const wrap = document.createElement("div");
+  wrap.className = "debug-block";
+  const head = document.createElement("div");
+  head.className = "debug-block-head";
+  const span = document.createElement("span");
+  span.textContent = label;
+  const copyBtn = document.createElement("button");
+  copyBtn.type = "button";
+  copyBtn.className = "debug-copy";
+  copyBtn.textContent = "کپی";
+  const text = JSON.stringify(payload, null, 2);
+  copyBtn.addEventListener("click", async () => {
+    try { await navigator.clipboard.writeText(text); copyBtn.textContent = "کپی شد ✓"; }
+    catch (e) { copyBtn.textContent = "خطا"; }
+    setTimeout(() => { copyBtn.textContent = "کپی"; }, 1500);
+  });
+  head.append(span, copyBtn);
+  const pre = document.createElement("pre");
+  pre.className = "debug-pre";
+  pre.dir = "ltr";
+  pre.textContent = text;
+  wrap.append(head, pre);
+  return wrap;
+}
+
+async function loadDebugLog() {
+  if (!currentChatId) return;
+  const data = await api("/api/chats/" + currentChatId + "/debug");
+  const exchanges = (data && data.exchanges) || [];
+  debugLogEl.innerHTML = "";
+  if (!exchanges.length) {
+    debugLogEl.innerHTML = '<p class="debug-empty">هنوز درخواستی ثبت نشده است.</p>';
+    return;
+  }
+  exchanges.forEach((ex) => {
+    const entry = document.createElement("div");
+    entry.className = "debug-entry";
+    const title = document.createElement("p");
+    title.className = "debug-round";
+    title.textContent = "دور " + ex.round + " — " + (ex.time || "");
+    entry.appendChild(title);
+    entry.appendChild(debugBlock("📤 فرستنده — Request", ex.request));
+    entry.appendChild(debugBlock("📥 گیرنده — Response", ex.response));
+    debugLogEl.appendChild(entry);
+  });
+  debugLogEl.scrollTop = debugLogEl.scrollHeight;
+}
 
 /* ================= شروع ================= */
 (async function start() {

@@ -90,6 +90,14 @@ def get_chat(chat_id):
     return jsonify({**chat.summary(), "messages": chat.bot.visible_messages()})
 
 
+@app.route("/api/chats/<chat_id>/debug", methods=["GET"])
+def get_debug_log(chat_id):
+    chat, error = get_chat_or_404(chat_id)
+    if error:
+        return error
+    return jsonify({"exchanges": chat.bot.api_log})
+
+
 @app.route("/api/chats/<chat_id>/message", methods=["POST"])
 def send_message(chat_id):
     chat, error = get_chat_or_404(chat_id)
