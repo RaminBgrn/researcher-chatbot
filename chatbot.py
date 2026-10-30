@@ -78,6 +78,7 @@ class ResearcherChatbot:
                 tool_choice="auto",
             )
             message = response.choices[0].message
+            print(response.choices)
 
             # جواب/درخواست مدل هم وارد هیستوری می‌شود
             self.history.append(message.model_dump(exclude_none=True))
