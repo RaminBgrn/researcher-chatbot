@@ -18,7 +18,7 @@ from dotenv import load_dotenv
 from openai import OpenAI
 
 from prompts import SYSTEM_PROMPT
-from tools import TOOLS, TOOL_FUNCTIONS
+from tools import TOOLS, TOOL_FUNCTIONS, save_research
 
 load_dotenv()  # خواندن .env
 
@@ -27,6 +27,22 @@ BASE_URL = os.getenv("BASE_URL", "")      # همان endpoint ای که داده
 MODEL_NAME = os.getenv("MODEL_NAME", "")  # همان اسم مدلی که داده می‌شود
 
 MAX_TOOL_ROUNDS = 5  # سقف دفعات رفت‌وبرگشت ابزار، تا حلقه بی‌نهایت نشود
+
+# ابزارهای تحقیقی: اگر در یک نوبت چت یکی از این‌ها با موفقیت اجرا شود،
+# جواب نهایی آن نوبت «گزارش» حساب می‌شود و کد خودش آن را در فایل ذخیره می‌کند.
+RESEARCH_TOOLS = {"search_wikipedia", "search_web", "get_weather"}
+
+
+def _derive_title(content: str, fallback: str) -> str:
+    """عنوان گزارش را از اولین خط معنادار جواب نهایی می‌سازد."""
+    for line in content.splitlines():
+        title = line.strip().lstrip("#").strip()
+        title = title.replace("**", "").strip()
+        if title.lower().startswith("عنوان:"):
+            title = title.split(":", 1)[1].strip()
+        if len(title) >= 3:
+            return title[:60]
+    return fallback[:60]
 
 
 class ResearcherChatbot:
@@ -72,6 +88,9 @@ class ResearcherChatbot:
         # ۱) پیام کاربر به هیستوری اضافه می‌شود
         self.history.append({"role": "user", "content": user_message})
 
+        # در این نوبت تحقیقی انجام شده یا نه؟ (برای ذخیره خودکار گزارش)
+        researched = False
+
         # ۲) حلقه اصلی: پرسیدن از مدل + اجرای ابزارها تا جواب نهایی
         for _ in range(MAX_TOOL_ROUNDS):
             # اسنپ‌شات درخواست، برای پنل دیباگ: دقیقاً همان چیزی که برای مدل می‌رود
@@ -108,7 +127,20 @@ class ResearcherChatbot:
 
             # اگر ابزاری نخواسته، یعنی جواب نهایی آماده است
             if not message.tool_calls:
-                return message.content or ""
+                reply = message.content or ""
+                # ذخیره خودکار و قطعی توسط کد (نه مدل): اگر این نوبت تحقیق داشت،
+                # جواب نهایی گزارش است و بدون یک دور اضافه و تولید دوباره متن،
+                # همان‌جا در فایل ذخیره می‌شود؛ اسم فایل را هم کد به جواب اضافه می‌کند.
+                if researched and reply.strip():
+                    try:
+                        saved = save_research(_derive_title(reply, user_message), reply)
+                        if saved.get("saved"):
+                            reply = f"{reply}\n\n📁 این گزارش به صورت خودکار در فایل «{saved['filename']}» ذخیره شد."
+                            # همان نسخه کامل در هیستوری هم بنشیند تا با نمایش UI یکی باشد
+                            self.history[-1]["content"] = reply
+                    except Exception:
+                        pass  # ذخیره نباید جواب کاربر را خراب کند
+                return reply
 
             # ۳) هر ابزاری که خواسته را اجرا و نتیجه را به هیستوری اضافه می‌کنیم
             for tool_call in message.tool_calls:
@@ -123,6 +155,10 @@ class ResearcherChatbot:
                         result = function(**args)
                     except Exception as e:
                         result = {"error": str(e)}
+
+                # تحقیق موفق در این نوبت؟ برای ذخیره خودکار جواب نهایی
+                if name in RESEARCH_TOOLS and isinstance(result, dict) and "error" not in result:
+                    researched = True
 
                 self.history.append(
                     {

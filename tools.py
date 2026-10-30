@@ -4,10 +4,15 @@ tools.py — ابزارهایی که مدل می‌تواند صدا بزند (T
 هر ابزار = یک تابع ساده پایتون + یک توضیح (schema) برای مدل.
 مدل خودش تصمیم می‌گیرد کی و با چه ورودی‌ای ابزار را صدا بزند.
 
-سه ابزار داریم:
+سه ابزار در اختیار مدل است:
 1. search_wikipedia : تحقیق دانشنامه‌ای درباره یک موضوع (بدون نیاز به API key)
 2. search_web       : جستجو در کل وب با Tavily (برای اطلاعات تازه؛ نیازمند TAVILY_API_KEY)
-3. save_research    : ذخیره گزارش نهایی در یک فایل داخل پوشه outputs/
+3. get_weather      : آب‌وهوای فعلی یک شهر از OpenWeather (نیازمند OPEN_WEATHER_KEY)
+
+و یک تابع داخلی هم هست که ابزار مدل نیست:
+- save_research : ذخیره گزارش در فایل؛ را خود کد (chatbot.py) بعد از جواب نهایی
+  به صورت خودکار صدا می‌زند، نه مدل. چون ذخیره یک اثر جانبی قطعی است و نباید
+  به تصمیم احتمالی مدل سپرده شود: هم گزارش دوبار تولید نمی‌شود، هم فراموش نمی‌شود.
 """
 
 import os
@@ -128,9 +133,13 @@ def search_web(query: str, max_results: int = 5) -> dict:
     return {"query": query, "results": results}
 
 
-# ---------------------------------------------------------------- ابزار ۳
+# ------------------------------------------------------- تابع داخلی (نه ابزار مدل)
 def save_research(title: str, content: str) -> dict:
-    """گزارش را در یک فایل متنی داخل پوشه outputs/ ذخیره می‌کند."""
+    """گزارش را در یک فایل متنی داخل پوشه outputs/ ذخیره می‌کند.
+
+    این تابع را مدل صدا نمی‌زند؛ chatbot.py بعد از آماده شدن جواب نهایی،
+    اگر در آن نوبت تحقیقی انجام شده باشد، خودش آن را صدا می‌زند.
+    """
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
     # از عنوان، یک اسم فایل امن و خوانا می‌سازیم
@@ -203,21 +212,6 @@ TOOLS = [
             },
         },
     },
-    {
-        "type": "function",
-        "function": {
-            "name": "save_research",
-            "description": "گزارش نهایی تحقیق را در یک فایل ذخیره می‌کند.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "title": {"type": "string", "description": "عنوان گزارش"},
-                    "content": {"type": "string", "description": "متن کامل گزارش"},
-                },
-                "required": ["title", "content"],
-            },
-        },
-    },
 ]
 
 # اسم ابزار -> خود تابع؛ برای اجرا کردن tool call ای که مدل خواسته است
@@ -225,5 +219,4 @@ TOOL_FUNCTIONS = {
     "get_weather" : get_weather,
     "search_wikipedia": search_wikipedia,
     "search_web": search_web,
-    "save_research": save_research,
 }
