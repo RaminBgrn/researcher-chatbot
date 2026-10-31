@@ -33,6 +33,39 @@ MAX_TOOL_ROUNDS = 5  # سقف دفعات رفت‌وبرگشت ابزار، تا
 RESEARCH_TOOLS = {"search_wikipedia", "search_web", "get_weather"}
 
 
+# ------------------------------------------------------------- شمارش توکن
+# شمارش با tiktoken (انکودینگ cl100k_base) «تخمینی» است؛ عدد قطعی را خود API
+# در فیلد usage پاسخ می‌دهد. اگر tiktoken نصب نباشد، برآورد کاراکتری جایگزین می‌شود.
+try:
+    import tiktoken
+
+    _ENC = tiktoken.get_encoding("cl100k_base")
+except Exception:  # pragma: no cover
+    _ENC = None
+
+
+def count_text_tokens(text: str) -> int:
+    """تعداد تقریبی توکن‌های یک متن."""
+    if not text:
+        return 0
+    if _ENC is not None:
+        return len(_ENC.encode(text))
+    return max(1, len(text) // 2)
+
+
+def count_messages_tokens(messages) -> int:
+    """تعداد تقریبی توکن‌های یک لیست پیام (با سربار قالب هر پیام)."""
+    total = 0
+    for message in messages:
+        total += 4  # سربار تقریبی نقش و قالب هر پیام
+        content = message.get("content")
+        if isinstance(content, str):
+            total += count_text_tokens(content)
+        if message.get("tool_calls"):
+            total += count_text_tokens(json.dumps(message["tool_calls"], ensure_ascii=False))
+    return total
+
+
 def _derive_title(content: str, fallback: str) -> str:
     """عنوان گزارش را از اولین خط معنادار جواب نهایی می‌سازد."""
     for line in content.splitlines():
@@ -51,7 +84,38 @@ class ResearcherChatbot:
         self.client = None
         if API_KEY:
             self.client = OpenAI(api_key=API_KEY, base_url=BASE_URL or None)
+        # تنظیمات توکن؛ از پنل تنظیمات UI قابل تغییرند (۰ یعنی نامحدود)
+        self.max_output_tokens = 1000
+        self.history_token_budget = 0
+        self.max_tool_rounds = MAX_TOOL_ROUNDS
         self.clear_history()
+
+    # ---------------------------------------------------------- آمار توکن
+    def usage_estimate(self) -> dict:
+        """برآورد توکنی وضعیت فعلی، برای نمایش در پنل تنظیمات."""
+        return {
+            "system_tokens": count_text_tokens(SYSTEM_PROMPT),
+            "tools_tokens": count_text_tokens(json.dumps(TOOLS, ensure_ascii=False)),
+            "history_tokens": count_messages_tokens(self.history),
+            "history_messages": len(self.history),
+        }
+
+    def _trim_history(self):
+        """اگر بودجه توکنی هیستوری رد شده باشد، قدیمی‌ترین بلوک‌ها حذف می‌شوند.
+
+        سیستم پرامپت (عضو اول) و بلوک جاری (آخرین پیام کاربر و ادامه‌اش) هرگز
+        حذف نمی‌شوند و حذف همیشه بلوکی است تا جفت tool_call و نتیجه‌اش از هم جدا نشوند.
+        """
+        budget = self.history_token_budget
+        if not budget or budget <= 0:
+            return
+        while count_messages_tokens(self.history) > budget:
+            user_starts = [
+                i for i, m in enumerate(self.history) if m.get("role") == "user"
+            ]
+            if len(user_starts) <= 1:
+                break  # فقط بلوک جاری مانده؛ دست نمی‌زنیم
+            del self.history[user_starts[0] : user_starts[1]]
 
     # ---------------------------------------------------------- هیستوری
     def clear_history(self):
@@ -91,8 +155,11 @@ class ResearcherChatbot:
         # در این نوبت تحقیقی انجام شده یا نه؟ (برای ذخیره خودکار گزارش)
         researched = False
 
+        # بودجه توکنی هیستوری اعمال می‌شود (اگر در تنظیمات فعال شده باشد)
+        self._trim_history()
+
         # ۲) حلقه اصلی: پرسیدن از مدل + اجرای ابزارها تا جواب نهایی
-        for _ in range(MAX_TOOL_ROUNDS):
+        for _ in range(self.max_tool_rounds):
             # اسنپ‌شات درخواست، برای پنل دیباگ: دقیقاً همان چیزی که برای مدل می‌رود
             request_payload = {
                 "model": MODEL_NAME,
@@ -100,11 +167,16 @@ class ResearcherChatbot:
                 "tools": TOOLS,
                 "tool_choice": "auto",
             }
+            create_kwargs = {}
+            if self.max_output_tokens:
+                create_kwargs["max_tokens"] = self.max_output_tokens
+                request_payload["max_tokens"] = self.max_output_tokens
             response = self.client.chat.completions.create(
                 model=MODEL_NAME,
                 messages=self.history,
                 tools=TOOLS,
                 tool_choice="auto",
+                **create_kwargs,
             )
             # پاسخ خام مدل را هم کنار درخواستش نگه می‌داریم
             try:

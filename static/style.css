@@ -318,3 +318,79 @@ h1 { font-size: 19px; }
   padding: 8px; max-height: 220px; overflow: auto; white-space: pre-wrap; word-break: break-word;
 }
 :root[data-theme="light"] .debug-pre { background: rgba(23, 26, 60, 0.05); }
+
+/* ---------------- تب‌های سایدبار ---------------- */
+.side-tabs {
+  display: flex; gap: 6px; margin: 12px 0 10px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px; padding: 4px;
+}
+.side-tab {
+  flex: 1; min-height: 36px; padding: 6px 4px;
+  background: transparent; color: var(--muted);
+  border: none; border-radius: 9px;
+  font: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer;
+}
+.side-tab:hover { color: var(--text); }
+.side-tab.active { background: var(--accent); color: #fff; }
+.side-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.side-pane { min-height: 0; }
+
+/* ---------------- JSON ردیفی (درخت کلید/مقدار) ---------------- */
+.jt-wrap {
+  direction: ltr; text-align: left;
+  background: rgba(0, 0, 0, 0.22);
+  border: 1px solid var(--border); border-radius: 8px;
+  padding: 8px; max-height: 300px; overflow: auto;
+  font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 11px; line-height: 1.7;
+}
+:root[data-theme="light"] .jt-wrap { background: rgba(23, 26, 60, 0.05); }
+.jt-row { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
+.jk { color: var(--accent-2); font-weight: 700; }
+.jk::after { content: ":"; opacity: 0.6; }
+.jv { color: var(--text); word-break: break-word; }
+.jv-str { color: #ffd479; }
+:root[data-theme="light"] .jv-str { color: #9a6a00; }
+.jv-num { color: #6ec1ff; }
+:root[data-theme="light"] .jv-num { color: #0b5cad; }
+.jv-bool { color: #ff8fb2; }
+.jv-null { color: var(--muted); font-style: italic; }
+.jv-more {
+  background: transparent; border: 1px solid var(--border); border-radius: 6px;
+  color: var(--accent-2); font: inherit; font-size: 10px; padding: 0 6px; margin-inline-start: 6px; cursor: pointer;
+}
+.jt-badge {
+  background: var(--surface-strong); color: var(--muted);
+  border: 1px solid var(--border); border-radius: 6px;
+  font: inherit; font-size: 10px; padding: 0 7px; cursor: pointer;
+}
+.jt-children {
+  margin-inline-start: 10px; padding-inline-start: 8px;
+  border-inline-start: 1px dashed var(--border);
+}
+
+/* ---------------- تب تنظیمات ---------------- */
+.settings-form { display: flex; flex-direction: column; gap: 10px; }
+.settings-form label { font-size: 12px; color: var(--muted); display: flex; flex-direction: column; gap: 5px; }
+.settings-form input {
+  min-height: 40px; padding: 7px 10px;
+  background: var(--surface); color: var(--text);
+  border: 1px solid var(--border); border-radius: 9px;
+  font: inherit; font-size: 13.5px; direction: ltr; text-align: left;
+}
+.settings-form input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.settings-apply {
+  min-height: 42px; border: none; border-radius: 10px; cursor: pointer;
+  background: linear-gradient(135deg, var(--accent), #5b8cff); color: #fff;
+  font: inherit; font-size: 13px; font-weight: 700;
+}
+.settings-msg { font-size: 12px; color: var(--accent-2); min-height: 16px; margin: 0; text-align: center; }
+.stats-box { margin-top: 14px; border-top: 1px solid var(--border); padding-top: 10px; }
+.stats-box h3 { font-size: 12.5px; margin: 0 0 8px; color: var(--text); }
+.stat-row {
+  display: flex; justify-content: space-between; align-items: baseline;
+  font-size: 12px; color: var(--muted); padding: 5px 2px;
+  border-bottom: 1px dashed var(--border);
+}
+.stat-row strong { color: var(--text); font-size: 12.5px; }
+.stats-note { font-size: 11px; color: var(--muted); margin-top: 8px; line-height: 1.8; }

@@ -26,21 +26,48 @@
         </div>
       </div>
 
-      <button id="newChatBtn" class="new-chat-btn">＋ چت جدید</button>
+      <!-- ---------- تب‌های سایدبار ---------- -->
+      <div class="side-tabs" role="tablist" aria-label="بخش‌های سایدبار">
+        <button class="side-tab active" data-tab="chats" role="tab" aria-selected="true">گفتگوها</button>
+        <button class="side-tab" data-tab="json" role="tab" aria-selected="false">JSON</button>
+        <button class="side-tab" data-tab="settings" role="tab" aria-selected="false">تنظیمات</button>
+      </div>
 
-      <nav id="chatList" class="chat-list"></nav>
+      <section id="pane-chats" class="side-pane">
+        <button id="newChatBtn" class="new-chat-btn">＋ چت جدید</button>
+        <nav id="chatList" class="chat-list"></nav>
+        <p class="side-foot">گزارش هر تحقیق در پوشه <code>outputs/</code> ذخیره می‌شود.</p>
+      </section>
 
-      <!-- ---------- پنل دیباگ: لاگ JSON رفت‌وبرگشت با مدل ---------- -->
-      <section class="debug-panel" aria-label="لاگ درخواست و پاسخ مدل">
-        <button id="debugToggle" class="debug-toggle" aria-expanded="false">🧾 لاگ JSON درخواست/پاسخ</button>
-        <div id="debugBody" class="debug-body" hidden>
-          <div id="debugLog" class="debug-log">
-            <p class="debug-empty">هنوز درخواستی ثبت نشده است.</p>
-          </div>
+      <!-- ---------- تب JSON: لاگ ردیفی رفت‌وبرگشت با مدل ---------- -->
+      <section id="pane-json" class="side-pane" hidden>
+        <div id="debugLog" class="debug-log">
+          <p class="debug-empty">هنوز درخواستی ثبت نشده است.</p>
         </div>
       </section>
 
-      <p class="side-foot">گزارش هر تحقیق در پوشه <code>outputs/</code> ذخیره می‌شود.</p>
+      <!-- ---------- تب تنظیمات: بازی با مقادیر توکن ---------- -->
+      <section id="pane-settings" class="side-pane" hidden>
+        <form id="settingsForm" class="settings-form">
+          <label>سقف توکن خروجی هر پاسخ (max_tokens — صفر یعنی نامحدود)
+            <input id="setMaxTokens" type="number" min="0" max="8000" step="50" />
+          </label>
+          <label>بودجه توکنی هیستوری (صفر یعنی نامحدود)
+            <input id="setHistoryBudget" type="number" min="0" max="100000" step="100" />
+          </label>
+          <label>حداکثر دور رفت‌وبرگشت ابزار در هر نوبت
+            <input id="setMaxRounds" type="number" min="1" max="10" step="1" />
+          </label>
+          <button type="submit" class="settings-apply">اعمال تنظیمات</button>
+          <p id="settingsMsg" class="settings-msg" role="status"></p>
+        </form>
+
+        <div class="stats-box">
+          <h3>آمار توکن این گفتگو (تخمینی)</h3>
+          <div id="statsBody" class="stats-body"></div>
+          <p class="stats-note">شمارش با tiktoken تخمینی است؛ عدد قطعی مصرف را API در تب JSON، بخش usage پاسخ‌ها، می‌دهد.</p>
+        </div>
+      </section>
     </aside>
     <div id="overlay" class="overlay"></div>
 

@@ -160,21 +160,84 @@ form.addEventListener("submit", async (e) => {
     sendBtn.disabled = false;
     await loadChats(); // عنوان و تعداد پیام‌ها تازه شود
     await loadDebugLog(); // لاگ JSON این گفتگو هم تازه شود
+    await loadStats(); // آمار توکن هم تازه شود
     input.focus();
   }
 });
 
-/* ================= پنل دیباگ: لاگ JSON درخواست/پاسخ ================= */
-const debugToggle = document.getElementById("debugToggle");
-const debugBody = document.getElementById("debugBody");
+/* ================= تب‌های سایدبار ================= */
+const sideTabBtns = document.querySelectorAll(".side-tab");
+function switchTab(name) {
+  sideTabBtns.forEach((b) => {
+    const on = b.dataset.tab === name;
+    b.classList.toggle("active", on);
+    b.setAttribute("aria-selected", on ? "true" : "false");
+  });
+  document.getElementById("pane-chats").hidden = name !== "chats";
+  document.getElementById("pane-json").hidden = name !== "json";
+  document.getElementById("pane-settings").hidden = name !== "settings";
+  if (name === "json") loadDebugLog();
+  if (name === "settings") { loadSettings(); loadStats(); }
+}
+sideTabBtns.forEach((b) => b.addEventListener("click", () => switchTab(b.dataset.tab)));
+
+/* ================= تب JSON: نمایش ردیفی (کلید و مقدار) ================= */
 const debugLogEl = document.getElementById("debugLog");
 
-debugToggle.addEventListener("click", async () => {
-  const willOpen = debugBody.hidden;
-  debugBody.hidden = !willOpen;
-  debugToggle.setAttribute("aria-expanded", willOpen ? "true" : "false");
-  if (willOpen) await loadDebugLog();
-});
+function jsonValueSpan(value) {
+  const span = document.createElement("span");
+  if (value === null) { span.className = "jv jv-null"; span.textContent = "null"; return span; }
+  if (typeof value === "number") { span.className = "jv jv-num"; span.textContent = String(value); return span; }
+  if (typeof value === "boolean") { span.className = "jv jv-bool"; span.textContent = String(value); return span; }
+  span.className = "jv jv-str";
+  const text = JSON.stringify(value);
+  if (text.length > 160) {
+    const short = document.createElement("span");
+    short.textContent = text.slice(0, 160) + "…";
+    const more = document.createElement("button");
+    more.type = "button"; more.className = "jv-more"; more.textContent = "بیشتر";
+    more.addEventListener("click", () => {
+      const full = span.dataset.full === "1";
+      span.dataset.full = full ? "0" : "1";
+      short.textContent = full ? text.slice(0, 160) + "…" : text;
+      more.textContent = full ? "بیشتر" : "کمتر";
+    });
+    span.append(short, more);
+  } else {
+    span.textContent = text;
+  }
+  return span;
+}
+
+function jsonNode(key, value, depth) {
+  const wrap = document.createElement("div");
+  wrap.className = "jt-node";
+  const row = document.createElement("div");
+  row.className = "jt-row";
+  const keyEl = document.createElement("span");
+  keyEl.className = "jk";
+  keyEl.textContent = key;
+  row.appendChild(keyEl);
+  if (value !== null && typeof value === "object") {
+    const isArr = Array.isArray(value);
+    const keys = Object.keys(value);
+    const badge = document.createElement("button");
+    badge.type = "button";
+    badge.className = "jt-badge";
+    badge.textContent = (isArr ? "[ ] " : "{ } ") + keys.length + (isArr ? " آیتم" : " فیلد") + " ▾";
+    row.appendChild(badge);
+    const children = document.createElement("div");
+    children.className = "jt-children";
+    keys.forEach((k) => children.appendChild(jsonNode(k, value[k], depth + 1)));
+    if (depth >= 2) children.hidden = true;
+    badge.addEventListener("click", () => { children.hidden = !children.hidden; });
+    wrap.append(row, children);
+  } else {
+    row.appendChild(jsonValueSpan(value));
+    wrap.appendChild(row);
+  }
+  return wrap;
+}
 
 function debugBlock(label, payload) {
   const wrap = document.createElement("div");
@@ -186,19 +249,18 @@ function debugBlock(label, payload) {
   const copyBtn = document.createElement("button");
   copyBtn.type = "button";
   copyBtn.className = "debug-copy";
-  copyBtn.textContent = "کپی";
+  copyBtn.textContent = "کپی JSON";
   const text = JSON.stringify(payload, null, 2);
   copyBtn.addEventListener("click", async () => {
     try { await navigator.clipboard.writeText(text); copyBtn.textContent = "کپی شد ✓"; }
     catch (e) { copyBtn.textContent = "خطا"; }
-    setTimeout(() => { copyBtn.textContent = "کپی"; }, 1500);
+    setTimeout(() => { copyBtn.textContent = "کپی JSON"; }, 1500);
   });
   head.append(span, copyBtn);
-  const pre = document.createElement("pre");
-  pre.className = "debug-pre";
-  pre.dir = "ltr";
-  pre.textContent = text;
-  wrap.append(head, pre);
+  const tree = document.createElement("div");
+  tree.className = "jt-wrap";
+  tree.appendChild(jsonNode("root", payload, 0));
+  wrap.append(head, tree);
   return wrap;
 }
 
@@ -222,7 +284,55 @@ async function loadDebugLog() {
     entry.appendChild(debugBlock("📥 گیرنده — Response", ex.response));
     debugLogEl.appendChild(entry);
   });
-  debugLogEl.scrollTop = debugLogEl.scrollHeight;
+}
+
+/* ================= تب تنظیمات: مقادیر توکن و آمار ================= */
+const settingsForm = document.getElementById("settingsForm");
+const settingsMsg = document.getElementById("settingsMsg");
+const statsBody = document.getElementById("statsBody");
+
+async function loadSettings() {
+  const s = await api("/api/settings");
+  document.getElementById("setMaxTokens").value = s.max_tokens;
+  document.getElementById("setHistoryBudget").value = s.history_token_budget;
+  document.getElementById("setMaxRounds").value = s.max_tool_rounds;
+}
+
+settingsForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const payload = {
+    max_tokens: Number(document.getElementById("setMaxTokens").value),
+    history_token_budget: Number(document.getElementById("setHistoryBudget").value),
+    max_tool_rounds: Number(document.getElementById("setMaxRounds").value),
+  };
+  const res = await fetch("/api/settings", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json();
+  settingsMsg.textContent = res.ok ? "اعمال شد ✓ از پیام بعدی اثرش را می‌بینی." : (data.error || "خطا در تنظیمات");
+  if (res.ok) loadStats();
+});
+
+function statRow(label, value) {
+  const row = document.createElement("div");
+  row.className = "stat-row";
+  const a = document.createElement("span"); a.textContent = label;
+  const b = document.createElement("strong"); b.textContent = value;
+  row.append(a, b);
+  return row;
+}
+
+async function loadStats() {
+  if (!currentChatId) return;
+  const s = await api("/api/chats/" + currentChatId + "/stats");
+  statsBody.innerHTML = "";
+  statsBody.appendChild(statRow("سیستم پرامپت", s.system_tokens + " توکن"));
+  statsBody.appendChild(statRow("اسکیمای ابزارها", s.tools_tokens + " توکن"));
+  statsBody.appendChild(statRow("هیستوری فعلی", s.history_tokens + " توکن (" + s.history_messages + " پیام)"));
+  statsBody.appendChild(statRow("برآورد ورودی تماس بعدی", "≈ " + (s.system_tokens + s.tools_tokens + s.history_tokens) + " توکن"));
+  statsBody.appendChild(statRow("تماس‌های ثبت‌شده در تب JSON", s.exchanges + " دور"));
 }
 
 /* ================= شروع ================= */

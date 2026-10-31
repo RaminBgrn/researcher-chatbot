@@ -98,6 +98,46 @@ def get_debug_log(chat_id):
     return jsonify({"exchanges": chat.bot.api_log})
 
 
+# ------------------------------------------------------------ تنظیمات توکن
+# از پنل تنظیمات سایدبار خوانده/نوشته می‌شوند و پیش از هر چت روی بات اعمال می‌شوند.
+# مقدار ۰ برای max_tokens و history_token_budget یعنی «نامحدود».
+SETTINGS = {"max_tokens": 1000, "history_token_budget": 0, "max_tool_rounds": 5}
+
+_SETTINGS_LIMITS = {
+    "max_tokens": (0, 8000),
+    "history_token_budget": (0, 100000),
+    "max_tool_rounds": (1, 10),
+}
+
+
+@app.route("/api/settings", methods=["GET"])
+def get_settings():
+    return jsonify(SETTINGS)
+
+
+@app.route("/api/settings", methods=["POST"])
+def update_settings():
+    data = request.get_json() or {}
+    for key, (low, high) in _SETTINGS_LIMITS.items():
+        if key in data:
+            try:
+                value = int(data[key])
+            except (TypeError, ValueError):
+                return jsonify({"error": f"مقدار {key} باید عدد باشد."}), 400
+            if not low <= value <= high:
+                return jsonify({"error": f"مقدار {key} باید بین {low} و {high} باشد."}), 400
+            SETTINGS[key] = value
+    return jsonify(SETTINGS)
+
+
+@app.route("/api/chats/<chat_id>/stats", methods=["GET"])
+def get_chat_stats(chat_id):
+    chat, error = get_chat_or_404(chat_id)
+    if error:
+        return error
+    return jsonify({**chat.bot.usage_estimate(), "exchanges": len(chat.bot.api_log)})
+
+
 @app.route("/api/chats/<chat_id>/message", methods=["POST"])
 def send_message(chat_id):
     chat, error = get_chat_or_404(chat_id)
@@ -111,6 +151,11 @@ def send_message(chat_id):
     # عنوان گفتگو از اولین پیام کاربر ساخته می‌شود
     if chat.title == "گفتگوی جدید":
         chat.title = message[:30] + ("…" if len(message) > 30 else "")
+
+    # تنظیمات توکن فعلی روی بات اعمال می‌شود
+    chat.bot.max_output_tokens = SETTINGS["max_tokens"]
+    chat.bot.history_token_budget = SETTINGS["history_token_budget"]
+    chat.bot.max_tool_rounds = SETTINGS["max_tool_rounds"]
 
     reply = chat.bot.chat(message)
     return jsonify({"reply": reply, "chat": chat.summary()})
