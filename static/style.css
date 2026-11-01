@@ -408,3 +408,46 @@ h1 { font-size: 19px; }
 }
 .invoice-head span { color: var(--muted); font-size: 11px; }
 .invoice-card .stat-row:last-child { border-bottom: none; }
+
+/* ---------------- حباب‌های مدرن: بردر و گرادیان ---------------- */
+.msg.bot { flex-direction: column; align-items: flex-end; }
+.msg.user .bubble {
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  box-shadow: 0 8px 20px rgba(124, 92, 255, 0.32);
+}
+.msg.bot .bubble {
+  background: linear-gradient(180deg, var(--surface-strong), var(--surface));
+  border: 1px solid var(--border);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.16);
+}
+
+/* ---------------- دکمه ذخیره گزارش زیر حباب ---------------- */
+.msg-actions { margin-top: 6px; }
+.save-report-btn {
+  min-height: 34px; padding: 5px 14px; cursor: pointer;
+  background: var(--surface); color: var(--accent-2);
+  border: 1px solid var(--border); border-radius: 999px;
+  font: inherit; font-size: 12.5px; font-weight: 700;
+  transition: 0.2s;
+}
+.save-report-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--text); transform: translateY(-1px); }
+.save-report-btn:disabled { cursor: default; opacity: 0.85; }
+.save-report-btn.saved { color: var(--accent-2); border-color: var(--accent-2); }
+
+/* ---------------- لودینگ سه‌نقطه ---------------- */
+.bubble.typing-dots {
+  display: flex; gap: 6px; align-items: center;
+  padding: 16px 18px; min-width: 74px; justify-content: center;
+}
+.tdot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--muted);
+  animation: tblink 1.15s infinite ease-in-out;
+}
+.tdot:nth-child(2) { animation-delay: 0.15s; }
+.tdot:nth-child(3) { animation-delay: 0.3s; }
+@keyframes tblink {
+  0%, 80%, 100% { transform: translateY(0); opacity: 0.35; }
+  40% { transform: translateY(-4px); opacity: 1; }
+}

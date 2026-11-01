@@ -88,6 +88,8 @@ class ResearcherChatbot:
         self.max_output_tokens = 1000
         self.history_token_budget = 0
         self.max_tool_rounds = MAX_TOOL_ROUNDS
+        # آیا در آخرین نوبت ابزاری صدا زده شد؟ (برای دکمه «ذخیره گزارش» زیر حباب)
+        self.last_used_tools = False
         self.clear_history()
 
     # ---------------------------------------------------------- آمار توکن
@@ -170,6 +172,13 @@ class ResearcherChatbot:
         self.history = [{"role": "system", "content": SYSTEM_PROMPT}]
         # لاگ خام رفت‌وبرگشت با مدل، برای پنل دیباگ UI (نمایش JSON درخواست و پاسخ)
         self.api_log = []
+        # شناسه پیام‌های نهایی‌ای که در نوبتشان ابزار صدا زده شده (برای دکمه ذخیره)
+        self._tool_msg_ids = set()
+        self.last_used_tools = False
+
+    def save_report(self, content: str) -> dict:
+        """ذخیره دستی یک جواب به‌عنوان گزارش در outputs (دکمه زیر حباب چت)."""
+        return save_research(_derive_title(content, "گزارش"), content)
 
     def visible_messages(self):
         """فقط پیام‌هایی که کاربر باید ببیند: پیام‌های او و جواب‌های نهایی بات.
@@ -181,7 +190,13 @@ class ResearcherChatbot:
             role = message.get("role")
             content = message.get("content")
             if role in ("user", "assistant") and content:
-                visible.append({"role": role, "content": content})
+                visible.append(
+                    {
+                        "role": role,
+                        "content": content,
+                        "used_tools": id(message) in self._tool_msg_ids,
+                    }
+                )
         return visible
 
     # -------------------------------------------------------------- چت
@@ -199,8 +214,10 @@ class ResearcherChatbot:
         # ۱) پیام کاربر به هیستوری اضافه می‌شود
         self.history.append({"role": "user", "content": user_message})
 
-        # در این نوبت تحقیقی انجام شده یا نه؟ (برای ذخیره خودکار گزارش)
-        researched = False
+        # در این نوبت ابزاری صدا زده شد یا نه؟ (ذخیره گزارش دیگر خودکار نیست؛
+        # این پرچم فقط مشخص می‌کند زیر جواب نهایی دکمه «ذخیره گزارش» بیاید یا نه)
+        used_tools = False
+        self.last_used_tools = False
 
         # بودجه توکنی هیستوری اعمال می‌شود (اگر در تنظیمات فعال شده باشد)
         self._trim_history()
@@ -247,21 +264,14 @@ class ResearcherChatbot:
             # اگر ابزاری نخواسته، یعنی جواب نهایی آماده است
             if not message.tool_calls:
                 reply = message.content or ""
-                # ذخیره خودکار و قطعی توسط کد (نه مدل): اگر این نوبت تحقیق داشت،
-                # جواب نهایی گزارش است و بدون یک دور اضافه و تولید دوباره متن،
-                # همان‌جا در فایل ذخیره می‌شود؛ اسم فایل را هم کد به جواب اضافه می‌کند.
-                if researched and reply.strip():
-                    try:
-                        saved = save_research(_derive_title(reply, user_message), reply)
-                        if saved.get("saved"):
-                            reply = f"{reply}\n\n📁 این گزارش به صورت خودکار در فایل «{saved['filename']}» ذخیره شد."
-                            # همان نسخه کامل در هیستوری هم بنشیند تا با نمایش UI یکی باشد
-                            self.history[-1]["content"] = reply
-                    except Exception:
-                        pass  # ذخیره نباید جواب کاربر را خراب کند
+                # ذخیره گزارش دستی است (دکمه زیر حباب)؛ این‌جا فقط پرچم می‌خورد
+                self.last_used_tools = used_tools
+                if used_tools:
+                    self._tool_msg_ids.add(id(self.history[-1]))
                 return reply
 
             # ۳) هر ابزاری که خواسته را اجرا و نتیجه را به هیستوری اضافه می‌کنیم
+            used_tools = True
             for tool_call in message.tool_calls:
                 name = tool_call.function.name
                 args = json.loads(tool_call.function.arguments or "{}")
@@ -275,10 +285,6 @@ class ResearcherChatbot:
                     except Exception as e:
                         result = {"error": str(e)}
 
-                # تحقیق موفق در این نوبت؟ برای ذخیره خودکار جواب نهایی
-                if name in RESEARCH_TOOLS and isinstance(result, dict) and "error" not in result:
-                    researched = True
-
                 self.history.append(
                     {
                         "role": "tool",
@@ -288,4 +294,5 @@ class ResearcherChatbot:
                 )
             # و حلقه ادامه پیدا می‌کند تا مدل با نتیجه ابزارها جواب نهایی بدهد
 
+        self.last_used_tools = used_tools
         return "متأسفم، تعداد مراحل تحقیق بیش از حد شد. لطفا دوباره تلاش کن."

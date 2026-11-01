@@ -166,7 +166,25 @@ def send_message(chat_id):
     chat.bot.max_tool_rounds = SETTINGS["max_tool_rounds"]
 
     reply = chat.bot.chat(message)
-    return jsonify({"reply": reply, "chat": chat.summary()})
+    return jsonify(
+        {"reply": reply, "used_tools": chat.bot.last_used_tools, "chat": chat.summary()}
+    )
+
+
+@app.route("/api/chats/<chat_id>/save-report", methods=["POST"])
+def save_report(chat_id):
+    chat, error = get_chat_or_404(chat_id)
+    if error:
+        return error
+
+    content = (request.get_json() or {}).get("content", "").strip()
+    if not content:
+        return jsonify({"error": "متنی برای ذخیره نیست."}), 400
+
+    result = chat.bot.save_report(content)
+    if not result.get("saved"):
+        return jsonify({"error": result.get("error", "ذخیره گزارش انجام نشد.")}), 500
+    return jsonify(result)
 
 
 @app.route("/api/chats/<chat_id>", methods=["DELETE"])

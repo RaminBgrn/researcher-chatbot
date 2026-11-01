@@ -82,16 +82,70 @@ async function loadChats() {
   return chats;
 }
 
-function addMessage(text, who) {
+function addMessage(text, who, opts) {
   const wrap = document.createElement("div");
   wrap.className = "msg " + who;
   const bubble = document.createElement("div");
   bubble.className = "bubble";
   bubble.textContent = text;
   wrap.appendChild(bubble);
+  // دکمه ذخیره گزارش فقط زیر جواب‌هایی می‌آید که در نوبتشان ابزار صدا زده شده
+  if (who === "bot" && opts && opts.usedTools) addSaveButton(wrap, text);
   messagesEl.appendChild(wrap);
   messagesEl.scrollTop = messagesEl.scrollHeight;
   return bubble;
+}
+
+/* حباب لودینگ سه‌نقطه متحرک، تا وقتی جواب مدل برسد */
+function addTyping() {
+  const wrap = document.createElement("div");
+  wrap.className = "msg bot";
+  const bubble = document.createElement("div");
+  bubble.className = "bubble typing-dots";
+  bubble.setAttribute("aria-label", "در حال تحقیق");
+  for (let i = 0; i < 3; i++) {
+    const dot = document.createElement("span");
+    dot.className = "tdot";
+    bubble.appendChild(dot);
+  }
+  wrap.appendChild(bubble);
+  messagesEl.appendChild(wrap);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+  return wrap;
+}
+
+/* دکمه «ذخیره گزارش» زیر حباب بات؛ ذخیره دستی و فقط با کلیک کاربر */
+function addSaveButton(wrap, content) {
+  const actions = document.createElement("div");
+  actions.className = "msg-actions";
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "save-report-btn";
+  btn.textContent = "📁 ذخیره گزارش";
+  btn.addEventListener("click", async () => {
+    btn.disabled = true;
+    btn.textContent = "در حال ذخیره...";
+    try {
+      const res = await fetch("/api/chats/" + currentChatId + "/save-report", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: content }),
+      });
+      const d = await res.json();
+      if (res.ok && d.saved) {
+        btn.textContent = "✓ ذخیره شد — " + d.filename;
+        btn.classList.add("saved");
+      } else {
+        btn.textContent = "خطا در ذخیره — دوباره تلاش کن";
+        btn.disabled = false;
+      }
+    } catch (err) {
+      btn.textContent = "خطا در ذخیره — دوباره تلاش کن";
+      btn.disabled = false;
+    }
+  });
+  actions.appendChild(btn);
+  wrap.appendChild(actions);
 }
 
 async function openChat(id) {
@@ -101,7 +155,7 @@ async function openChat(id) {
   if (!chat.messages || !chat.messages.length) {
     addMessage(WELCOME, "bot");
   } else {
-    chat.messages.forEach((m) => addMessage(m.content, m.role === "user" ? "user" : "bot"));
+    chat.messages.forEach((m) => addMessage(m.content, m.role === "user" ? "user" : "bot", { usedTools: m.used_tools }));
   }
   await loadChats();
   await loadDebugLog();
@@ -142,8 +196,7 @@ form.addEventListener("submit", async (e) => {
   addMessage(text, "user");
   input.value = "";
   sendBtn.disabled = true;
-  const typing = addMessage("در حال تحقیق... 🔎", "bot");
-  typing.classList.add("typing");
+  const typing = addTyping();
 
   try {
     const data = await api("/api/chats/" + currentChatId + "/message", {
@@ -151,11 +204,11 @@ form.addEventListener("submit", async (e) => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ message: text }),
     });
-    typing.classList.remove("typing");
-    typing.textContent = data.reply || data.error || "پاسخی نیامد.";
+    typing.remove();
+    addMessage(data.reply || data.error || "پاسخی نیامد.", "bot", { usedTools: data.used_tools });
   } catch (err) {
-    typing.classList.remove("typing");
-    typing.textContent = "خطا در اتصال به سرور. مطمئن شو سرور روشنه.";
+    typing.remove();
+    addMessage("خطا در اتصال به سرور. مطمئن شو سرور روشنه.", "bot");
   } finally {
     sendBtn.disabled = false;
     await loadChats(); // عنوان و تعداد پیام‌ها تازه شود
