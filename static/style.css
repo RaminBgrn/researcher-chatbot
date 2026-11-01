@@ -335,7 +335,7 @@ h1 { font-size: 19px; }
 .side-tab.active { background: var(--accent); color: #fff; }
 .side-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .side-pane { flex: 1; min-height: 0; overflow-y: auto; }
-#pane-chats:not([hidden]) { display: flex; flex-direction: column; overflow: hidden; }
+#pane-chats:not([hidden]) { display: flex; flex-direction: column; overflow: hidden; gap: 12px; }
 
 /* ---------------- JSON ردیفی (درخت کلید/مقدار) ---------------- */
 .jt-wrap {
