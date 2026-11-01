@@ -94,7 +94,4 @@ python app.py
 - Python + Flask
 - OpenAI Python SDK (برای هر endpoint سازگار با OpenAI)
 - Wikipedia API (بدون نیاز به کلید)
-- Tavily API (ابزار جستجوی وب)
-- OpenWeather API (ابزار آب‌وهوا)
-- tiktoken (تخمین تعداد توکن‌ها برای بودجه هیستوری و آمار تب تنظیمات)
 - HTML / CSS / JavaScript خالص، بدون فریم‌ورک فرانت‌اند

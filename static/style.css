@@ -394,3 +394,16 @@ h1 { font-size: 19px; }
 }
 .stat-row strong { color: var(--text); font-size: 12.5px; }
 .stats-note { font-size: 11px; color: var(--muted); margin-top: 8px; line-height: 1.8; }
+
+/* ---------------- تب فاکتورها ---------------- */
+.invoice-list { display: flex; flex-direction: column; gap: 10px; }
+.invoice-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px; padding: 10px 12px;
+}
+.invoice-head {
+  display: flex; justify-content: space-between; align-items: baseline;
+  font-size: 12.5px; margin-bottom: 4px;
+}
+.invoice-head span { color: var(--muted); font-size: 11px; }
+.invoice-card .stat-row:last-child { border-bottom: none; }

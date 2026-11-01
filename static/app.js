@@ -160,6 +160,7 @@ form.addEventListener("submit", async (e) => {
     sendBtn.disabled = false;
     await loadChats(); // عنوان و تعداد پیام‌ها تازه شود
     await loadDebugLog(); // لاگ JSON این گفتگو هم تازه شود
+    await loadInvoices(); // فاکتورهای توکنی هم تازه شوند
     await loadStats(); // آمار توکن هم تازه شود
     input.focus();
   }
@@ -175,8 +176,10 @@ function switchTab(name) {
   });
   document.getElementById("pane-chats").hidden = name !== "chats";
   document.getElementById("pane-json").hidden = name !== "json";
+  document.getElementById("pane-invoices").hidden = name !== "invoices";
   document.getElementById("pane-settings").hidden = name !== "settings";
   if (name === "json") loadDebugLog();
+  if (name === "invoices") loadInvoices();
   if (name === "settings") { loadSettings(); loadStats(); }
 }
 sideTabBtns.forEach((b) => b.addEventListener("click", () => switchTab(b.dataset.tab)));
@@ -283,6 +286,56 @@ async function loadDebugLog() {
     entry.appendChild(debugBlock("📤 فرستنده — Request", ex.request));
     entry.appendChild(debugBlock("📥 گیرنده — Response", ex.response));
     debugLogEl.appendChild(entry);
+  });
+}
+
+
+/* ================= تب فاکتورها: قبض توکنی هر دور ================= */
+const invoiceListEl = document.getElementById("invoiceList");
+
+function invoiceRow(label, value, bold) {
+  const row = document.createElement("div");
+  row.className = "stat-row";
+  const a = document.createElement("span"); a.textContent = label;
+  const b = document.createElement(bold ? "strong" : "span");
+  b.textContent = value;
+  row.append(a, b);
+  return row;
+}
+
+async function loadInvoices() {
+  if (!currentChatId) return;
+  const data = await api("/api/chats/" + currentChatId + "/invoices");
+  const invoices = (data && data.invoices) || [];
+  invoiceListEl.innerHTML = "";
+  if (!invoices.length) {
+    invoiceListEl.innerHTML = '<p class="debug-empty">هنوز فاکتوری ثبت نشده است.</p>';
+    return;
+  }
+  invoices.slice().reverse().forEach((inv) => {
+    const card = document.createElement("article");
+    card.className = "invoice-card";
+    const head = document.createElement("div");
+    head.className = "invoice-head";
+    const t = document.createElement("strong");
+    t.textContent = "🧾 فاکتور دور " + inv.round;
+    const time = document.createElement("span");
+    time.textContent = inv.time || "";
+    head.append(t, time);
+    card.appendChild(head);
+    if (inv.called_tools && inv.called_tools.length) {
+      card.appendChild(invoiceRow("ابزار صدا زده‌شده", inv.called_tools.join("، ")));
+    }
+    card.appendChild(invoiceRow("ورودی (prompt) — واقعی", inv.prompt_tokens != null ? inv.prompt_tokens + " توکن" : "—"));
+    card.appendChild(invoiceRow("↳ سیستم پرامپت (تخمینی)", inv.est_system_tokens + " توکن"));
+    card.appendChild(invoiceRow("↳ اسکیمای ابزارها (تخمینی)", inv.est_tools_tokens + " توکن"));
+    card.appendChild(invoiceRow("↳ هیستوری (تخمینی)", inv.est_history_tokens + " توکن"));
+    card.appendChild(invoiceRow("خروجی (completion) — واقعی", inv.completion_tokens != null ? inv.completion_tokens + " توکن" : "—"));
+    card.appendChild(invoiceRow("جمع کل — واقعی", inv.total_tokens != null ? inv.total_tokens + " توکن" : "—", true));
+    if (inv.finish_reason) {
+      card.appendChild(invoiceRow("دلیل پایان (finish_reason)", inv.finish_reason));
+    }
+    invoiceListEl.appendChild(card);
   });
 }
 

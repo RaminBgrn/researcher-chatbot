@@ -130,6 +130,14 @@ def update_settings():
     return jsonify(SETTINGS)
 
 
+@app.route("/api/chats/<chat_id>/invoices", methods=["GET"])
+def get_chat_invoices(chat_id):
+    chat, error = get_chat_or_404(chat_id)
+    if error:
+        return error
+    return jsonify({"invoices": chat.bot.invoices()})
+
+
 @app.route("/api/chats/<chat_id>/stats", methods=["GET"])
 def get_chat_stats(chat_id):
     chat, error = get_chat_or_404(chat_id)

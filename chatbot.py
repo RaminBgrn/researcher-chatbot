@@ -100,6 +100,53 @@ class ResearcherChatbot:
             "history_messages": len(self.history),
         }
 
+    def invoices(self) -> list:
+        """فاکتور توکنی هر دور رفت‌وبرگشت با مدل، برای تب «فاکتورها».
+
+        اعداد usage واقعیِ خود API هستند؛ شکست ورودی به اجزا (سیستم / ابزارها /
+        هیستوری) با شمارش‌گر خودمان تخمین زده می‌شود تا معلوم شود هر بخش چقدر از
+        ورودی را ساخته است.
+        """
+        result = []
+        for entry in self.api_log:
+            request = entry.get("request") or {}
+            response = entry.get("response") or {}
+            messages = request.get("messages") or []
+
+            system_tokens = 0
+            if messages and messages[0].get("role") == "system":
+                system_tokens = count_text_tokens(messages[0].get("content") or "") + 4
+            tools_tokens = count_text_tokens(json.dumps(request.get("tools") or [], ensure_ascii=False))
+            all_messages_tokens = count_messages_tokens(messages)
+            history_tokens = max(0, all_messages_tokens - system_tokens)
+
+            usage = response.get("usage") or {}
+            choices = response.get("choices") or []
+            finish_reason = choices[0].get("finish_reason") if choices else None
+            called_tools = []
+            if choices:
+                for tc in (choices[0].get("message") or {}).get("tool_calls") or []:
+                    name = ((tc.get("function") or {}).get("name"))
+                    if name:
+                        called_tools.append(name)
+
+            result.append(
+                {
+                    "round": entry.get("round"),
+                    "time": entry.get("time"),
+                    "prompt_tokens": usage.get("prompt_tokens"),
+                    "completion_tokens": usage.get("completion_tokens"),
+                    "total_tokens": usage.get("total_tokens"),
+                    "est_system_tokens": system_tokens,
+                    "est_tools_tokens": tools_tokens,
+                    "est_history_tokens": history_tokens,
+                    "est_prompt_tokens": system_tokens + tools_tokens + history_tokens,
+                    "finish_reason": finish_reason,
+                    "called_tools": called_tools,
+                }
+            )
+        return result
+
     def _trim_history(self):
         """اگر بودجه توکنی هیستوری رد شده باشد، قدیمی‌ترین بلوک‌ها حذف می‌شوند.
 

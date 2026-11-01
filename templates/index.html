@@ -30,6 +30,7 @@
       <div class="side-tabs" role="tablist" aria-label="بخش‌های سایدبار">
         <button class="side-tab active" data-tab="chats" role="tab" aria-selected="true">گفتگوها</button>
         <button class="side-tab" data-tab="json" role="tab" aria-selected="false">JSON</button>
+        <button class="side-tab" data-tab="invoices" role="tab" aria-selected="false">فاکتورها</button>
         <button class="side-tab" data-tab="settings" role="tab" aria-selected="false">تنظیمات</button>
       </div>
 
@@ -44,6 +45,14 @@
         <div id="debugLog" class="debug-log">
           <p class="debug-empty">هنوز درخواستی ثبت نشده است.</p>
         </div>
+      </section>
+
+      <!-- ---------- تب فاکتورها: قبض توکنی هر دور ---------- -->
+      <section id="pane-invoices" class="side-pane" hidden>
+        <div id="invoiceList" class="invoice-list">
+          <p class="debug-empty">هنوز فاکتوری ثبت نشده است.</p>
+        </div>
+        <p class="stats-note">عددهای «ورودی/خروجی/جمع» واقعی و از usage خود API هستند؛ شکست ورودی به سیستم، ابزارها و هیستوری تخمینی است.</p>
       </section>
 
       <!-- ---------- تب تنظیمات: بازی با مقادیر توکن ---------- -->
