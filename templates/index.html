@@ -31,6 +31,7 @@
         <button class="side-tab active" data-tab="chats" role="tab" aria-selected="true">گفتگوها</button>
         <button class="side-tab" data-tab="json" role="tab" aria-selected="false">JSON</button>
         <button class="side-tab" data-tab="invoices" role="tab" aria-selected="false">فاکتورها</button>
+        <button class="side-tab" data-tab="eval" role="tab" aria-selected="false">ارزیابی</button>
         <button class="side-tab" data-tab="settings" role="tab" aria-selected="false">تنظیمات</button>
       </div>
 
@@ -53,6 +54,19 @@
           <p class="debug-empty">هنوز فاکتوری ثبت نشده است.</p>
         </div>
         <p class="stats-note">عددهای «ورودی/خروجی/جمع» واقعی و از usage خود API هستند؛ شکست ورودی به سیستم، ابزارها و هیستوری تخمینی است.</p>
+      </section>
+
+      <!-- ---------- تب ارزیابی: ارزیابی آنلاین نوبت‌ها ---------- -->
+      <section id="pane-eval" class="side-pane" hidden>
+        <div class="stats-box" style="margin-top: 0; border-top: none; padding-top: 0;">
+          <h3>خلاصه ارزیابی آنلاین</h3>
+          <div id="evalSummary" class="stats-body"></div>
+        </div>
+        <h3 style="font-size: 12.5px; margin: 14px 0 8px;">نوبت‌های اخیر</h3>
+        <div id="evalRecent" class="invoice-list">
+          <p class="debug-empty">هنوز نوبتی ثبت نشده است.</p>
+        </div>
+        <p class="stats-note">نرخ‌ها از لاگ دائمی نوبت‌ها حساب می‌شوند؛ فیدبک را با 👍 و 👎 زیر هر جواب بات می‌دهی.</p>
       </section>
 
       <!-- ---------- تب تنظیمات: بازی با مقادیر توکن ---------- -->

@@ -22,6 +22,7 @@ from datetime import datetime
 from flask import Flask, jsonify, render_template, request
 
 from chatbot import ResearcherChatbot
+import eval_store
 
 app = Flask(__name__)
 
@@ -166,9 +167,39 @@ def send_message(chat_id):
     chat.bot.max_tool_rounds = SETTINGS["max_tool_rounds"]
 
     reply = chat.bot.chat(message)
+
+    # این نوبت در لاگ ارزیابی آنلاین ثبت می‌شود (با شناسه‌ای که فیدبک به آن وصل می‌شود)
+    turn_id = None
+    if chat.bot.last_turn:
+        record = eval_store.append_record({**chat.bot.last_turn, "chat_id": chat_id})
+        turn_id = record["id"]
+
     return jsonify(
-        {"reply": reply, "used_tools": chat.bot.last_used_tools, "chat": chat.summary()}
+        {
+            "reply": reply,
+            "used_tools": chat.bot.last_used_tools,
+            "turn_id": turn_id,
+            "chat": chat.summary(),
+        }
     )
+
+
+# ------------------------------------------------------------ ارزیابی آنلاین
+@app.route("/api/eval/feedback", methods=["POST"])
+def eval_feedback():
+    data = request.get_json() or {}
+    turn_id = data.get("turn_id")
+    rating = data.get("rating")
+    if not turn_id or rating not in ("up", "down"):
+        return jsonify({"error": "turn_id و rating (up/down) لازم است."}), 400
+    if not eval_store.set_feedback(turn_id, rating):
+        return jsonify({"error": "این نوبت در لاگ ارزیابی پیدا نشد."}), 404
+    return jsonify({"ok": True})
+
+
+@app.route("/api/eval/summary", methods=["GET"])
+def eval_summary():
+    return jsonify(eval_store.summarize(eval_store.load_records()))
 
 
 @app.route("/api/chats/<chat_id>/save-report", methods=["POST"])

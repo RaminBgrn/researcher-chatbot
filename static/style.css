@@ -451,3 +451,15 @@ h1 { font-size: 19px; }
   0%, 80%, 100% { transform: translateY(0); opacity: 0.35; }
   40% { transform: translateY(-4px); opacity: 1; }
 }
+
+/* ---------------- دکمه‌های فیدبک ارزیابی ---------------- */
+.fb-btn {
+  min-width: 40px; min-height: 34px; padding: 4px 10px; cursor: pointer;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 999px;
+  font-size: 14px; line-height: 1; transition: 0.2s;
+}
+.msg-actions { display: flex; gap: 6px; }
+.fb-btn:hover:not(:disabled) { border-color: var(--accent); transform: translateY(-1px); }
+.fb-btn:disabled { cursor: default; opacity: 0.55; }
+.fb-btn.selected-up { border-color: var(--accent-2); opacity: 1; background: var(--surface-strong); }
+.fb-btn.selected-down { border-color: #ff8fb2; opacity: 1; background: var(--surface-strong); }

@@ -88,8 +88,10 @@ class ResearcherChatbot:
         self.max_output_tokens = 1000
         self.history_token_budget = 0
         self.max_tool_rounds = MAX_TOOL_ROUNDS
-        # آیا در آخرین نوبت ابزاری صدا زده شد؟ (برای دکمه «ذخیره گزارش» زیر حباب)
+        # آیا در آخرین نوبت ابزاری صدا زده شد؟
         self.last_used_tools = False
+        # خلاصه آخرین نوبت برای لاگ ارزیابی آنلاین (Eval)
+        self.last_turn = None
         self.clear_history()
 
     # ---------------------------------------------------------- آمار توکن
@@ -172,13 +174,51 @@ class ResearcherChatbot:
         self.history = [{"role": "system", "content": SYSTEM_PROMPT}]
         # لاگ خام رفت‌وبرگشت با مدل، برای پنل دیباگ UI (نمایش JSON درخواست و پاسخ)
         self.api_log = []
-        # شناسه پیام‌های نهایی‌ای که در نوبتشان ابزار صدا زده شده (برای دکمه ذخیره)
+        # شناسه پیام‌های نهایی‌ای که در نوبتشان ابزار صدا زده شده
         self._tool_msg_ids = set()
+        # نگاشت پیام نهایی به شناسه نوبت ارزیابی، برای دکمه‌های فیدبک زیر حباب
+        self._turn_by_msg_id = {}
         self.last_used_tools = False
+        self.last_turn = None
 
     def save_report(self, content: str) -> dict:
-        """ذخیره دستی یک جواب به‌عنوان گزارش در outputs (دکمه زیر حباب چت)."""
+        """ذخیره یک جواب به‌عنوان گزارش در outputs."""
         return save_research(_derive_title(content, "گزارش"), content)
+
+    def _finish_turn(self, log_start: int, user_message: str, used_tools: bool, saved_file=None):
+        """خلاصه این نوبت را برای لاگ ارزیابی می‌سازد و در self.last_turn می‌گذارد."""
+        import uuid
+
+        entries = self.api_log[log_start:]
+        tools = []
+        prompt_tokens = completion_tokens = total_tokens = 0
+        finish_reason = None
+        for entry in entries:
+            response = entry.get("response") or {}
+            usage = response.get("usage") or {}
+            prompt_tokens += usage.get("prompt_tokens") or 0
+            completion_tokens += usage.get("completion_tokens") or 0
+            total_tokens += usage.get("total_tokens") or 0
+            choices = response.get("choices") or []
+            if choices:
+                finish_reason = choices[0].get("finish_reason")
+                for tc in (choices[0].get("message") or {}).get("tool_calls") or []:
+                    name = (tc.get("function") or {}).get("name")
+                    if name and name not in tools:
+                        tools.append(name)
+        self.last_turn = {
+            "id": uuid.uuid4().hex[:12],
+            "user": user_message[:120],
+            "tools": tools,
+            "rounds": len(entries),
+            "finish_reason": finish_reason,
+            "prompt_tokens": prompt_tokens,
+            "completion_tokens": completion_tokens,
+            "total_tokens": total_tokens,
+            "used_tools": used_tools,
+            "saved": saved_file,
+        }
+        return self.last_turn
 
     def visible_messages(self):
         """فقط پیام‌هایی که کاربر باید ببیند: پیام‌های او و جواب‌های نهایی بات.
@@ -195,6 +235,7 @@ class ResearcherChatbot:
                         "role": role,
                         "content": content,
                         "used_tools": id(message) in self._tool_msg_ids,
+                        "turn_id": self._turn_by_msg_id.get(id(message)),
                     }
                 )
         return visible
@@ -214,10 +255,10 @@ class ResearcherChatbot:
         # ۱) پیام کاربر به هیستوری اضافه می‌شود
         self.history.append({"role": "user", "content": user_message})
 
-        # در این نوبت ابزاری صدا زده شد یا نه؟ (ذخیره گزارش دیگر خودکار نیست؛
-        # این پرچم فقط مشخص می‌کند زیر جواب نهایی دکمه «ذخیره گزارش» بیاید یا نه)
+        # در این نوبت ابزاری صدا زده شد یا نه؟
         used_tools = False
         self.last_used_tools = False
+        log_start = len(self.api_log)
 
         # بودجه توکنی هیستوری اعمال می‌شود (اگر در تنظیمات فعال شده باشد)
         self._trim_history()
@@ -264,10 +305,25 @@ class ResearcherChatbot:
             # اگر ابزاری نخواسته، یعنی جواب نهایی آماده است
             if not message.tool_calls:
                 reply = message.content or ""
-                # ذخیره گزارش دستی است (دکمه زیر حباب)؛ این‌جا فقط پرچم می‌خورد
                 self.last_used_tools = used_tools
                 if used_tools:
                     self._tool_msg_ids.add(id(self.history[-1]))
+                # ذخیره خودکارِ مشروط (تصمیم رامین): فقط وقتی در این نوبت ابزار
+                # صدا زده شده و تولید هم کامل و طبیعی تمام شده (finish_reason=stop).
+                # جواب ناتمام (length) ذخیره نمی‌شود چون گزارش کاملی نیست.
+                finish_reason = getattr(response.choices[0], "finish_reason", None)
+                saved_file = None
+                if used_tools and finish_reason == "stop" and reply.strip():
+                    try:
+                        saved = save_research(_derive_title(reply, user_message), reply)
+                        if saved.get("saved"):
+                            saved_file = saved["filename"]
+                            reply = f"{reply}\n\n📁 این گزارش به صورت خودکار در فایل «{saved_file}» ذخیره شد."
+                            self.history[-1]["content"] = reply
+                    except Exception:
+                        pass  # ذخیره نباید جواب کاربر را خراب کند
+                turn = self._finish_turn(log_start, user_message, used_tools, saved_file)
+                self._turn_by_msg_id[id(self.history[-1])] = turn["id"]
                 return reply
 
             # ۳) هر ابزاری که خواسته را اجرا و نتیجه را به هیستوری اضافه می‌کنیم
@@ -295,4 +351,5 @@ class ResearcherChatbot:
             # و حلقه ادامه پیدا می‌کند تا مدل با نتیجه ابزارها جواب نهایی بدهد
 
         self.last_used_tools = used_tools
+        self._finish_turn(log_start, user_message, used_tools)
         return "متأسفم، تعداد مراحل تحقیق بیش از حد شد. لطفا دوباره تلاش کن."

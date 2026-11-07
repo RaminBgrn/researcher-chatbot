@@ -89,8 +89,8 @@ function addMessage(text, who, opts) {
   bubble.className = "bubble";
   bubble.textContent = text;
   wrap.appendChild(bubble);
-  // دکمه ذخیره گزارش فقط زیر جواب‌هایی می‌آید که در نوبتشان ابزار صدا زده شده
-  if (who === "bot" && opts && opts.usedTools) addSaveButton(wrap, text);
+  // دکمه‌های فیدبک ارزیابی زیر جواب بات می‌آیند (وقتی نوبت شناسه ارزیابی دارد)
+  if (who === "bot" && opts && opts.turnId) addFeedback(wrap, opts.turnId);
   messagesEl.appendChild(wrap);
   messagesEl.scrollTop = messagesEl.scrollHeight;
   return bubble;
@@ -114,110 +114,34 @@ function addTyping() {
   return wrap;
 }
 
-/* دکمه «ذخیره گزارش» زیر حباب بات؛ ذخیره دستی و فقط با کلیک کاربر */
-function addSaveButton(wrap, content) {
+/* دکمه‌های فیدبک (ارزیابی آنلاین) زیر حباب بات: 👍 / 👎 برای همان نوبت */
+function addFeedback(wrap, turnId) {
   const actions = document.createElement("div");
   actions.className = "msg-actions";
-  const btn = document.createElement("button");
-  btn.type = "button";
-  btn.className = "save-report-btn";
-  btn.textContent = "📁 ذخیره گزارش";
-  btn.addEventListener("click", async () => {
-    btn.disabled = true;
-    btn.textContent = "در حال ذخیره...";
+  const up = document.createElement("button");
+  up.type = "button"; up.className = "fb-btn"; up.textContent = "👍"; up.title = "جواب خوب بود";
+  const down = document.createElement("button");
+  down.type = "button"; down.className = "fb-btn"; down.textContent = "👎"; down.title = "جواب خوب نبود";
+  async function rate(rating, btn) {
     try {
-      const res = await fetch("/api/chats/" + currentChatId + "/save-report", {
+      const res = await fetch("/api/eval/feedback", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: content }),
+        body: JSON.stringify({ turn_id: turnId, rating: rating }),
       });
-      const d = await res.json();
-      if (res.ok && d.saved) {
-        btn.textContent = "✓ ذخیره شد — " + d.filename;
-        btn.classList.add("saved");
-      } else {
-        btn.textContent = "خطا در ذخیره — دوباره تلاش کن";
-        btn.disabled = false;
-      }
-    } catch (err) {
-      btn.textContent = "خطا در ذخیره — دوباره تلاش کن";
-      btn.disabled = false;
-    }
-  });
-  actions.appendChild(btn);
+      if (!res.ok) return;
+      up.classList.toggle("selected-up", rating === "up");
+      down.classList.toggle("selected-down", rating === "down");
+      up.disabled = true;
+      down.disabled = true;
+      btn.textContent = rating === "up" ? "👍 ✓" : "👎 ✓";
+    } catch (err) { /* بی‌صدا رد می‌شویم؛ فیدبک نباید چت را خراب کند */ }
+  }
+  up.addEventListener("click", () => rate("up", up));
+  down.addEventListener("click", () => rate("down", down));
+  actions.append(up, down);
   wrap.appendChild(actions);
 }
-
-async function openChat(id) {
-  currentChatId = id;
-  const chat = await api("/api/chats/" + id);
-  messagesEl.innerHTML = "";
-  if (!chat.messages || !chat.messages.length) {
-    addMessage(WELCOME, "bot");
-  } else {
-    chat.messages.forEach((m) => addMessage(m.content, m.role === "user" ? "user" : "bot", { usedTools: m.used_tools }));
-  }
-  await loadChats();
-  await loadDebugLog();
-  closeSidebar();
-  input.focus();
-}
-
-async function newChat() {
-  const chat = await api("/api/chats", { method: "POST" });
-  await openChat(chat.id);
-}
-
-async function deleteChat(id) {
-  await api("/api/chats/" + id, { method: "DELETE" });
-  if (id === currentChatId) {
-    const chats = await loadChats();
-    if (chats.length) { await openChat(chats[0].id); return; }
-    await newChat();
-    return;
-  }
-  await loadChats();
-}
-
-document.getElementById("newChatBtn").addEventListener("click", newChat);
-
-/* پاک کردن گفتگوی فعال = حذفش و ساخت یک گفتگوی تازه */
-document.getElementById("clearBtn").addEventListener("click", async () => {
-  if (currentChatId) await api("/api/chats/" + currentChatId, { method: "DELETE" });
-  await newChat();
-});
-
-/* ================= ارسال پیام ================= */
-form.addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const text = input.value.trim();
-  if (!text || !currentChatId) return;
-
-  addMessage(text, "user");
-  input.value = "";
-  sendBtn.disabled = true;
-  const typing = addTyping();
-
-  try {
-    const data = await api("/api/chats/" + currentChatId + "/message", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: text }),
-    });
-    typing.remove();
-    addMessage(data.reply || data.error || "پاسخی نیامد.", "bot", { usedTools: data.used_tools });
-  } catch (err) {
-    typing.remove();
-    addMessage("خطا در اتصال به سرور. مطمئن شو سرور روشنه.", "bot");
-  } finally {
-    sendBtn.disabled = false;
-    await loadChats(); // عنوان و تعداد پیام‌ها تازه شود
-    await loadDebugLog(); // لاگ JSON این گفتگو هم تازه شود
-    await loadInvoices(); // فاکتورهای توکنی هم تازه شوند
-    await loadStats(); // آمار توکن هم تازه شود
-    input.focus();
-  }
-});
 
 /* ================= تب‌های سایدبار ================= */
 const sideTabBtns = document.querySelectorAll(".side-tab");
@@ -230,9 +154,11 @@ function switchTab(name) {
   document.getElementById("pane-chats").hidden = name !== "chats";
   document.getElementById("pane-json").hidden = name !== "json";
   document.getElementById("pane-invoices").hidden = name !== "invoices";
+  document.getElementById("pane-eval").hidden = name !== "eval";
   document.getElementById("pane-settings").hidden = name !== "settings";
   if (name === "json") loadDebugLog();
   if (name === "invoices") loadInvoices();
+  if (name === "eval") loadEval();
   if (name === "settings") { loadSettings(); loadStats(); }
 }
 sideTabBtns.forEach((b) => b.addEventListener("click", () => switchTab(b.dataset.tab)));
@@ -389,6 +315,50 @@ async function loadInvoices() {
       card.appendChild(invoiceRow("دلیل پایان (finish_reason)", inv.finish_reason));
     }
     invoiceListEl.appendChild(card);
+  });
+}
+
+
+/* ================= تب ارزیابی: خلاصه ارزیابی آنلاین ================= */
+const evalSummaryEl = document.getElementById("evalSummary");
+const evalRecentEl = document.getElementById("evalRecent");
+
+function pctText(v) { return v == null ? "—" : v + "٪"; }
+
+async function loadEval() {
+  const s = await api("/api/eval/summary");
+  if (!s) return;
+  evalSummaryEl.innerHTML = "";
+  evalSummaryEl.appendChild(statRow("نوبت‌های ثبت‌شده", s.turns));
+  evalSummaryEl.appendChild(statRow("نرخ جواب کامل (stop)", pctText(s.stop_rate)));
+  evalSummaryEl.appendChild(statRow("نرخ نوبت‌های ابزاری", pctText(s.tool_rate)));
+  evalSummaryEl.appendChild(statRow("نرخ ذخیره گزارش", pctText(s.saved_rate)));
+  evalSummaryEl.appendChild(statRow("میانگین توکن هر نوبت", s.avg_total_tokens == null ? "—" : s.avg_total_tokens));
+  evalSummaryEl.appendChild(statRow("فیدبک مثبت", s.feedback_up + " 👍"));
+  evalSummaryEl.appendChild(statRow("فیدبک منفی", s.feedback_down + " 👎"));
+  evalSummaryEl.appendChild(statRow("نرخ رضایت (از فیدبک‌ها)", pctText(s.positive_rate)));
+
+  evalRecentEl.innerHTML = "";
+  if (!s.recent || !s.recent.length) {
+    evalRecentEl.innerHTML = '<p class="debug-empty">هنوز نوبتی ثبت نشده است.</p>';
+    return;
+  }
+  s.recent.forEach((r) => {
+    const card = document.createElement("article");
+    card.className = "invoice-card";
+    const head = document.createElement("div");
+    head.className = "invoice-head";
+    const t = document.createElement("strong");
+    t.textContent = (r.user || "").slice(0, 42) || "—";
+    const time = document.createElement("span");
+    time.textContent = (r.time || "").slice(11) || "";
+    head.append(t, time);
+    card.appendChild(head);
+    card.appendChild(invoiceRow("ابزارها", (r.tools && r.tools.length) ? r.tools.join("، ") : "بدون ابزار"));
+    card.appendChild(invoiceRow("پایان", (r.finish_reason || "—") + " — " + (r.total_tokens || 0) + " توکن"));
+    card.appendChild(invoiceRow("گزارش ذخیره شد؟", r.saved ? "بله 📁" : "نه"));
+    card.appendChild(invoiceRow("فیدبک", r.feedback === "up" ? "👍" : (r.feedback === "down" ? "👎" : "—")));
+    evalRecentEl.appendChild(card);
   });
 }
 
