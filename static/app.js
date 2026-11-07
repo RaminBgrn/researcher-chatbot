@@ -143,6 +143,79 @@ function addFeedback(wrap, turnId) {
   wrap.appendChild(actions);
 }
 
+async function openChat(id) {
+  currentChatId = id;
+  const chat = await api("/api/chats/" + id);
+  messagesEl.innerHTML = "";
+  if (!chat.messages || !chat.messages.length) {
+    addMessage(WELCOME, "bot");
+  } else {
+    chat.messages.forEach((m) => addMessage(m.content, m.role === "user" ? "user" : "bot", { turnId: m.turn_id }));
+  }
+  await loadChats();
+  await loadDebugLog();
+  await loadInvoices();
+  closeSidebar();
+  input.focus();
+}
+
+async function newChat() {
+  const chat = await api("/api/chats", { method: "POST" });
+  await openChat(chat.id);
+}
+
+async function deleteChat(id) {
+  await api("/api/chats/" + id, { method: "DELETE" });
+  if (id === currentChatId) {
+    const chats = await loadChats();
+    if (chats.length) await openChat(chats[0].id);
+    else await newChat();
+  } else {
+    await loadChats();
+  }
+}
+
+document.getElementById("newChatBtn").addEventListener("click", newChat);
+
+/* پاک کردن گفتگوی فعال = حذفش و ساخت یک گفتگوی تازه */
+document.getElementById("clearBtn").addEventListener("click", async () => {
+  if (currentChatId) await api("/api/chats/" + currentChatId, { method: "DELETE" });
+  await newChat();
+});
+
+/* ================= ارسال پیام ================= */
+form.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const text = input.value.trim();
+  if (!text || !currentChatId) return;
+
+  addMessage(text, "user");
+  input.value = "";
+  sendBtn.disabled = true;
+  const typing = addTyping();
+
+  try {
+    const data = await api("/api/chats/" + currentChatId + "/message", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: text }),
+    });
+    typing.remove();
+    addMessage(data.reply || data.error || "پاسخی نیامد.", "bot", { turnId: data.turn_id });
+  } catch (err) {
+    typing.remove();
+    addMessage("خطا در اتصال به سرور. مطمئن شو سرور روشنه.", "bot");
+  } finally {
+    sendBtn.disabled = false;
+    await loadChats(); // عنوان و تعداد پیام‌ها تازه شود
+    await loadDebugLog(); // لاگ JSON این گفتگو هم تازه شود
+    await loadInvoices(); // فاکتورهای توکنی هم تازه شوند
+    await loadEval(); // خلاصه ارزیابی هم تازه شود
+    await loadStats(); // آمار توکن هم تازه شود
+    input.focus();
+  }
+});
+
 /* ================= تب‌های سایدبار ================= */
 const sideTabBtns = document.querySelectorAll(".side-tab");
 function switchTab(name) {
