@@ -16,13 +16,15 @@ app.py — سرور ساده وب (Flask)
 همه چیز در حافظه سرور نگه داشته می‌شود؛ با ری‌استارت سرور پاک می‌شود.
 """
 
+import threading
 import uuid
 from datetime import datetime
 
 from flask import Flask, jsonify, render_template, request
 
-from chatbot import ResearcherChatbot
+from chatbot import MODEL_NAME, ResearcherChatbot
 import eval_store
+import geval
 
 app = Flask(__name__)
 
@@ -173,6 +175,18 @@ def send_message(chat_id):
     if chat.bot.last_turn:
         record = eval_store.append_record({**chat.bot.last_turn, "chat_id": chat_id})
         turn_id = record["id"]
+        # داوری G-Eval در پس‌زمینه اجرا می‌شود تا کاربر منتظر داور نماند؛
+        # فقط گزارش‌های ذخیره‌شده (ابزار + stop) داوری می‌شوند.
+        if record.get("saved") and chat.bot.client is not None and chat.bot.last_sources:
+            answer_text = reply.split("\n\n📁")[0]
+            sources_snapshot = list(chat.bot.last_sources)
+
+            def _run_judge():
+                result = geval.judge(chat.bot.client, MODEL_NAME, message, sources_snapshot, answer_text)
+                if result:
+                    eval_store.set_geval(record["id"], result)
+
+            threading.Thread(target=_run_judge, daemon=True).start()
 
     return jsonify(
         {

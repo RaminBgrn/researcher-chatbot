@@ -78,6 +78,31 @@ def _derive_title(content: str, fallback: str) -> str:
     return fallback[:60]
 
 
+def _compact_value(value):
+    """نسخه فشرده یک مقدار نتیجه ابزار: رشته‌ها کوتاه و لیست‌ها محدود می‌شوند.
+
+    ایده Context Compression: بعد از این‌که مدل از نتیجه خام استفاده کرد و جواب
+    نهایی ساخته شد، نگه‌داشتن متن کامل منبع در هیستوری فقط هزینه دارد؛ یک
+    چکیده ساخت‌یافته (عنوان‌ها، لینک‌ها و اول هر متن) برای ادامه گفتگو کافی است.
+    """
+    if isinstance(value, str):
+        return value if len(value) <= 240 else value[:240] + "…[فشرده شد]"
+    if isinstance(value, list):
+        return [_compact_value(item) for item in value[:3]]
+    if isinstance(value, dict):
+        return {key: _compact_value(item) for key, item in value.items()}
+    return value
+
+
+def _compress_tool_content(content: str) -> str:
+    """متن JSON نتیجه یک ابزار را به نسخه فشرده‌اش تبدیل می‌کند."""
+    try:
+        data = json.loads(content)
+    except (TypeError, ValueError):
+        return content[:240] + "…[فشرده شد]" if len(content) > 240 else content
+    return json.dumps(_compact_value(data), ensure_ascii=False)
+
+
 class ResearcherChatbot:
     def __init__(self):
         # اگر کلید هنوز داده نشده باشد، چت‌بات بالا می‌آید ولی موقع چت خطای واضح می‌دهد
@@ -92,6 +117,8 @@ class ResearcherChatbot:
         self.last_used_tools = False
         # خلاصه آخرین نوبت برای لاگ ارزیابی آنلاین (Eval)
         self.last_turn = None
+        # منابع (نتیجه ابزارهای) آخرین نوبت، برای داور G-Eval
+        self.last_sources = []
         self.clear_history()
 
     # ---------------------------------------------------------- آمار توکن
@@ -180,12 +207,30 @@ class ResearcherChatbot:
         self._turn_by_msg_id = {}
         self.last_used_tools = False
         self.last_turn = None
+        self.last_sources = []
 
     def save_report(self, content: str) -> dict:
         """ذخیره یک جواب به‌عنوان گزارش در outputs."""
         return save_research(_derive_title(content, "گزارش"), content)
 
-    def _finish_turn(self, log_start: int, user_message: str, used_tools: bool, saved_file=None):
+    def _compress_turn_tools(self, start_index: int) -> int:
+        """نتیجه خام ابزارهای این نوبت را در هیستوری فشرده می‌کند.
+
+        فقط «محتوای» پیام‌های tool عوض می‌شود؛ نقش و tool_call_id سر جایشان
+        می‌مانند تا پروتکل گفتگو سالم بماند. برمی‌گرداند: توکنِ تخمینی صرفه‌جویی.
+        """
+        saved = 0
+        for message in self.history[start_index:]:
+            if message.get("role") != "tool":
+                continue
+            old_content = message.get("content") or ""
+            new_content = _compress_tool_content(old_content)
+            if len(new_content) < len(old_content):
+                saved += count_text_tokens(old_content) - count_text_tokens(new_content)
+                message["content"] = new_content
+        return saved
+
+    def _finish_turn(self, log_start: int, user_message: str, used_tools: bool, saved_file=None, compressed_saved=0):
         """خلاصه این نوبت را برای لاگ ارزیابی می‌سازد و در self.last_turn می‌گذارد."""
         import uuid
 
@@ -217,6 +262,7 @@ class ResearcherChatbot:
             "total_tokens": total_tokens,
             "used_tools": used_tools,
             "saved": saved_file,
+            "compressed_saved_tokens": compressed_saved,
         }
         return self.last_turn
 
@@ -254,6 +300,8 @@ class ResearcherChatbot:
 
         # ۱) پیام کاربر به هیستوری اضافه می‌شود
         self.history.append({"role": "user", "content": user_message})
+        turn_start = len(self.history) - 1  # از این‌جا به بعد مال همین نوبت است
+        turn_sources = []
 
         # در این نوبت ابزاری صدا زده شد یا نه؟
         used_tools = False
@@ -322,7 +370,9 @@ class ResearcherChatbot:
                             self.history[-1]["content"] = reply
                     except Exception:
                         pass  # ذخیره نباید جواب کاربر را خراب کند
-                turn = self._finish_turn(log_start, user_message, used_tools, saved_file)
+                self.last_sources = turn_sources
+                compressed_saved = self._compress_turn_tools(turn_start)
+                turn = self._finish_turn(log_start, user_message, used_tools, saved_file, compressed_saved)
                 self._turn_by_msg_id[id(self.history[-1])] = turn["id"]
                 return reply
 
@@ -341,6 +391,9 @@ class ResearcherChatbot:
                     except Exception as e:
                         result = {"error": str(e)}
 
+                turn_sources.append(
+                    {"tool": name, "content": json.dumps(result, ensure_ascii=False)[:1200]}
+                )
                 self.history.append(
                     {
                         "role": "tool",
@@ -351,5 +404,7 @@ class ResearcherChatbot:
             # و حلقه ادامه پیدا می‌کند تا مدل با نتیجه ابزارها جواب نهایی بدهد
 
         self.last_used_tools = used_tools
-        self._finish_turn(log_start, user_message, used_tools)
+        self.last_sources = turn_sources
+        compressed_saved = self._compress_turn_tools(turn_start)
+        self._finish_turn(log_start, user_message, used_tools, None, compressed_saved)
         return "متأسفم، تعداد مراحل تحقیق بیش از حد شد. لطفا دوباره تلاش کن."

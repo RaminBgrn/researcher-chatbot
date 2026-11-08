@@ -410,6 +410,7 @@ async function loadEval() {
   evalSummaryEl.appendChild(statRow("فیدبک مثبت", s.feedback_up + " 👍"));
   evalSummaryEl.appendChild(statRow("فیدبک منفی", s.feedback_down + " 👎"));
   evalSummaryEl.appendChild(statRow("نرخ رضایت (از فیدبک‌ها)", pctText(s.positive_rate)));
+  evalSummaryEl.appendChild(statRow("میانگین G-Eval (از ۵)", s.geval_avg == null ? "—" : s.geval_avg + " — از " + s.geval_count + " گزارش"));
 
   evalRecentEl.innerHTML = "";
   if (!s.recent || !s.recent.length) {
@@ -431,6 +432,14 @@ async function loadEval() {
     card.appendChild(invoiceRow("پایان", (r.finish_reason || "—") + " — " + (r.total_tokens || 0) + " توکن"));
     card.appendChild(invoiceRow("گزارش ذخیره شد؟", r.saved ? "بله 📁" : "نه"));
     card.appendChild(invoiceRow("فیدبک", r.feedback === "up" ? "👍" : (r.feedback === "down" ? "👎" : "—")));
+    if (r.geval && r.geval.scores) {
+      const sc = r.geval.scores;
+      card.appendChild(invoiceRow("نمره G-Eval", r.geval.overall + " از ۵"));
+      card.appendChild(invoiceRow("جزئیات داور", "ارتباط " + sc.relevance + " · اتکا " + sc.grounding + " · کامل‌بودن " + sc.completeness + " · وضوح " + sc.clarity));
+    }
+    if (r.compressed_saved_tokens) {
+      card.appendChild(invoiceRow("صرفه‌جویی فشرده‌سازی", "≈ " + r.compressed_saved_tokens + " توکن"));
+    }
     evalRecentEl.appendChild(card);
   });
 }

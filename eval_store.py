@@ -58,6 +58,17 @@ def set_feedback(turn_id: str, rating: str, path=None) -> bool:
     return False
 
 
+def set_geval(turn_id: str, geval: dict, path=None) -> bool:
+    """نمره‌های G-Eval را روی رکورد همان نوبت می‌نشاند."""
+    records = load_records(path)
+    for record in records:
+        if record.get("id") == turn_id:
+            record["geval"] = geval
+            _save(records, path)
+            return True
+    return False
+
+
 def _pct(part: int, whole: int):
     return round(part * 100 / whole, 1) if whole else None
 
@@ -72,6 +83,11 @@ def summarize(records: list) -> dict:
     rated = [r for r in records if r.get("feedback") in ("up", "down")]
     ups = sum(1 for r in rated if r["feedback"] == "up")
     total_tokens = sum(r.get("total_tokens") or 0 for r in records)
+    geval_scores = [
+        r["geval"]["overall"]
+        for r in records
+        if isinstance(r.get("geval"), dict) and isinstance(r["geval"].get("overall"), (int, float))
+    ]
     return {
         "turns": turns,
         "stop_rate": _pct(stopped, len(with_finish)),
@@ -81,5 +97,7 @@ def summarize(records: list) -> dict:
         "feedback_up": ups,
         "feedback_down": len(rated) - ups,
         "positive_rate": _pct(ups, len(rated)),
+        "geval_count": len(geval_scores),
+        "geval_avg": round(sum(geval_scores) / len(geval_scores), 2) if geval_scores else None,
         "recent": list(reversed(records[-10:])),
     }

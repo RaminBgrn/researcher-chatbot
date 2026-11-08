@@ -124,7 +124,7 @@ def search_web(query: str, max_results: int = 5) -> dict:
         results.append({
             "title": item.get("title", ""),
             "url": item.get("url", ""),
-            "content": (item.get("content") or "")[:800],  # هر نتیجه را کوتاه نگه می‌داریم
+            "content": (item.get("content") or "")[:400],  # هر نتیجه را کوتاه نگه می‌داریم (درس Compression)
         })
 
     if not results:
