@@ -436,6 +436,9 @@ async function loadEval() {
       const sc = r.geval.scores;
       card.appendChild(invoiceRow("نمره G-Eval", r.geval.overall + " از ۵"));
       card.appendChild(invoiceRow("جزئیات داور", "ارتباط " + sc.relevance + " · اتکا " + sc.grounding + " · کامل‌بودن " + sc.completeness + " · وضوح " + sc.clarity));
+      if (r.geval.notes) {
+        card.appendChild(invoiceRow("یادداشت داور", r.geval.notes));
+      }
     }
     if (r.compressed_saved_tokens) {
       card.appendChild(invoiceRow("صرفه‌جویی فشرده‌سازی", "≈ " + r.compressed_saved_tokens + " توکن"));
