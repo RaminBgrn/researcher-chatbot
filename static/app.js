@@ -440,6 +440,13 @@ async function loadEval() {
         card.appendChild(invoiceRow("یادداشت داور", r.geval.notes));
       }
     }
+    if (!r.geval && r.geval_status === "pending") {
+      card.appendChild(invoiceRow("وضعیت داوری", "در حال داوری… ⏳"));
+    }
+    if (!r.geval && r.geval_status === "error") {
+      card.appendChild(invoiceRow("وضعیت داوری", "خطا ❌"));
+      if (r.geval_error) card.appendChild(invoiceRow("دلیل خطای داور", r.geval_error));
+    }
     if (r.compressed_saved_tokens) {
       card.appendChild(invoiceRow("صرفه‌جویی فشرده‌سازی", "≈ " + r.compressed_saved_tokens + " توکن"));
     }

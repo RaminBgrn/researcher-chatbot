@@ -181,10 +181,16 @@ def send_message(chat_id):
             answer_text = reply.split("\n\n📁")[0]
             sources_snapshot = list(chat.bot.last_sources)
 
+            eval_store.set_geval_status(record["id"], "pending")
+
             def _run_judge():
-                result = geval.judge(chat.bot.client, MODEL_NAME, message, sources_snapshot, answer_text)
+                result, error = geval.judge_detailed(
+                    chat.bot.client, MODEL_NAME, message, sources_snapshot, answer_text
+                )
                 if result:
                     eval_store.set_geval(record["id"], result)
+                else:
+                    eval_store.set_geval_status(record["id"], "error", error)
 
             threading.Thread(target=_run_judge, daemon=True).start()
 

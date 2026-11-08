@@ -77,10 +77,16 @@ def parse_judge_output(text: str):
     return {"scores": scores, "overall": overall, "notes": str(data.get("notes", ""))[:200]}
 
 
-def judge(client, model: str, question: str, sources: list, answer: str):
-    """داوری G-Eval یک نوبت؛ هر خطایی None برمی‌گرداند تا جریان اصلی آسیب نبیند."""
-    if client is None or not answer.strip():
-        return None
+def judge_detailed(client, model: str, question: str, sources: list, answer: str):
+    """داوری G-Eval با گزارش دلیل شکست: (result, error) — دقیقاً یکی از این دو پر است.
+
+    تا پیش از این، شکست داور کاملاً خاموش بود و هیچ ردی در UI نمی‌ماند؛ حالا
+    دلیل (خطای API یا خروجی نامعتبر) برمی‌گردد تا در تب ارزیابی نمایش داده شود.
+    """
+    if client is None:
+        return None, "کلاینت مدل در دسترس نیست."
+    if not answer.strip():
+        return None, "جواب نهایی خالی است."
     try:
         response = client.chat.completions.create(
             model=model,
@@ -90,6 +96,16 @@ def judge(client, model: str, question: str, sources: list, answer: str):
             ],
             max_tokens=700,
         )
-        return parse_judge_output(response.choices[0].message.content or "")
-    except Exception:
-        return None
+    except Exception as exc:
+        return None, f"خطای فراخوانی مدل داور: {exc}"[:300]
+    raw = response.choices[0].message.content or ""
+    result = parse_judge_output(raw)
+    if result is None:
+        return None, f"خروجی داور JSON معتبر نبود: {raw[:150]}"
+    return result, None
+
+
+def judge(client, model: str, question: str, sources: list, answer: str):
+    """داوری G-Eval یک نوبت؛ هر خطایی None برمی‌گرداند تا جریان اصلی آسیب نبیند."""
+    result, _error = judge_detailed(client, model, question, sources, answer)
+    return result

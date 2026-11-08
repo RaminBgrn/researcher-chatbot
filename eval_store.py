@@ -59,11 +59,28 @@ def set_feedback(turn_id: str, rating: str, path=None) -> bool:
 
 
 def set_geval(turn_id: str, geval: dict, path=None) -> bool:
-    """نمره‌های G-Eval را روی رکورد همان نوبت می‌نشاند."""
+    """نمره‌های G-Eval را روی رکورد همان نوبت می‌نشاند و وضعیت را done می‌کند."""
     records = load_records(path)
     for record in records:
         if record.get("id") == turn_id:
             record["geval"] = geval
+            record["geval_status"] = "done"
+            record.pop("geval_error", None)
+            _save(records, path)
+            return True
+    return False
+
+
+def set_geval_status(turn_id: str, status: str, error: str = None, path=None) -> bool:
+    """وضعیت داوری یک نوبت را ثبت می‌کند: pending / error (done با set_geval است)."""
+    if status not in ("pending", "error"):
+        return False
+    records = load_records(path)
+    for record in records:
+        if record.get("id") == turn_id:
+            record["geval_status"] = status
+            if error:
+                record["geval_error"] = str(error)[:300]
             _save(records, path)
             return True
     return False
